@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
+  <link rel="icon" type="image/png" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FINANZAS">
+  <title>FINANZAS</title>
+  <link rel="stylesheet" href="css.css">
+</head>
+
+<body>
+  <div class="header" id="headerCuentas"></div>
+
+  <div class="tablas-wrapper">
+    <div class="tabla-container">
+      <h3 class="tabla-titulo">Últimos Movimientos</h3>
+      <div id="tablaMovimientos" class="tabla-movimientos"></div>
+    </div>
+    <div class="tabla-container">
+      <h3 class="tabla-titulo titulo-pendientes">Pendientes de Pago</h3>
+      <div id="tablaPendientes" class="tabla-pendientes"></div>
+    </div>
+  </div>
+
+  <div class="floating-menu">
+    <button class="btn-menu-principal" id="btnMenuPrincipal">☰</button>
+    <div class="menu-opciones" id="menuOpciones">
+      <button class="btn-float plus" title="Nuevo Ingreso">+</button>
+      <button class="btn-float minus" title="Nueva Salida">−</button>
+      <button class="btn-float transfer" title="Transferencia">⇄</button>
+      <button class="btn-float edit" title="Editar Pendientes">✎</button>
+      <button class="btn-float refresh" title="Refrescar">↻</button>
+    </div>
+  </div>
+
+  <!-- MODAL INGRESO -->
+  <div id="modalIngreso" class="modal">
+    <div class="modal-content">
+      <h2>Nuevo Ingreso</h2>
+      <label>Fecha:</label>
+      <input type="date" id="ingresoFecha">
+      <label>Descripción:</label>
+      <input type="text" id="ingresoDescripcion" placeholder="Ej: Venta producto">
+      <label>Categoría:</label>
+      <select id="ingresoCategoria"></select>
+      <label>Monto:</label>
+      <input type="number" id="ingresoMonto" placeholder="0" inputmode="decimal">
+      <label>Cuenta:</label>
+      <select id="ingresoCuenta"></select>
+      <div class="modal-buttons">
+        <button id="btnGuardarIngreso">Guardar</button>
+        <button id="btnCancelarIngreso">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SALIDA -->
+  <div id="modalSalida" class="modal">
+    <div class="modal-content">
+      <h2>Nueva Salida</h2>
+      <label>Fecha:</label>
+      <input type="date" id="salidaFecha">
+      <label>Descripción:</label>
+      <input type="text" id="salidaDescripcion" placeholder="Ej: Compra mercancía">
+      <label>Categoría:</label>
+      <select id="salidaCategoria"></select>
+      <label>Subcategoría:</label>
+      <select id="salidaSubcategoria"></select>
+      <label>Monto:</label>
+      <input type="number" id="salidaMonto" placeholder="0" inputmode="decimal">
+      <label>Cuenta:</label>
+      <select id="salidaCuenta"></select>
+      <div class="modal-buttons">
+        <button id="btnGuardarSalida">Guardar</button>
+        <button id="btnCancelarSalida">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TRANSFERENCIA -->
+  <div id="modalTransferencia" class="modal">
+    <div class="modal-content">
+      <h2>Nueva Transferencia</h2>
+      <label>Descripción (opcional):</label>
+      <input type="text" id="transferenciaDescripcion" placeholder="Ej: Transferencia para gastos">
+      <label>Cuenta Origen:</label>
+      <select id="transferenciaCuentaOrigen"></select>
+      <div class="transferencia-visual"><span class="flecha">↓</span></div>
+      <label>Cuenta Destino:</label>
+      <select id="transferenciaCuentaDestino"></select>
+      <label>Monto:</label>
+      <input type="number" id="transferenciaMonto" placeholder="0" inputmode="decimal">
+      <div class="modal-buttons">
+        <button id="btnGuardarTransferencia">Transferir</button>
+        <button id="btnCancelarTransferencia">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR PENDIENTES -->
+  <div id="modalPendientes" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Editar Pendientes</h2>
+        <button id="btnReiniciarPendientes"
+          style="background:#cc0000;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;">
+          Reiniciar
+        </button>
+      </div>
+      <div id="listaPendientesContainer" style="margin-top:10px;"></div>
+      <div class="modal-buttons">
+        <button id="btnGuardarAbonos" style="background-color:#004481;">Guardar Abonos</button>
+        <button id="btnCancelarPendiente" style="background-color:#666;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js.js"></script>
+</body>
+</html>
