@@ -331,6 +331,43 @@ app.delete('/api/pendientes/:id', (req, res) => {
   db.prepare('DELETE FROM pendientes WHERE id = ?').run(parseInt(req.params.id));
   res.json({ success: true });
 });
+
+
+// ========== CONSULTA PENDIENTES PARA SHORTCUTS ==========
+app.get('/api/consulta/pendientes', (req, res) => {
+  const pendientes = db.prepare("SELECT * FROM pendientes WHERE pagado != 'OK' AND monto_mensual > 0").all();
+
+  if (!pendientes.length) {
+    res.json({ success: true, message: '✅ No tienes pagos pendientes' });
+    return;
+  }
+
+  // Agrupar por categoría
+  const grupos = {};
+  pendientes.forEach(p => {
+    const cat = p.categoria || 'Sin categoría';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  let mensaje = '📋 PENDIENTES POR PAGAR:\n\n';
+  let totalGeneral = 0;
+
+  Object.keys(grupos).sort().forEach(cat => {
+    const totalCat = grupos[cat].reduce((s, p) => s + Math.max(p.monto_mensual - (p.abono || 0), 0), 0);
+    mensaje += `📁 ${cat} ($${totalCat.toLocaleString('es-CO')})\n`;
+    grupos[cat].forEach(p => {
+      const faltante = Math.max(p.monto_mensual - (p.abono || 0), 0);
+      mensaje += `  · ${p.descripcion}: $${faltante.toLocaleString('es-CO')}\n`;
+    });
+    totalGeneral += totalCat;
+    mensaje += '\n';
+  });
+
+  mensaje += `💰 TOTAL: $${totalGeneral.toLocaleString('es-CO')}`;
+
+  res.json({ success: true, message: mensaje });
+});
 // ========== INICIO ==========
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
