@@ -27,6 +27,13 @@ app.post('/api/cuentas', (req, res) => {
   }
 });
 
+// Eliminar cuenta
+app.delete('/api/cuentas/:nombre', (req, res) => {
+  const { nombre } = req.params;
+  db.prepare('DELETE FROM cuentas WHERE nombre = ?').run(nombre);
+  res.json({ success: true });
+});
+
 // ========== CATEGORIAS ==========
 app.get('/api/categorias', (req, res) => {
   const ingresos = db.prepare("SELECT nombre FROM categorias WHERE tipo = 'ingreso'").all().map(c => c.nombre);
@@ -217,6 +224,113 @@ app.post('/api/pendientes/reiniciar', (req, res) => {
   res.json({ success: true, message: 'Abonos reiniciados correctamente' });
 });
 
+// ========== CONFIGURACION PENDIENTES ==========
+
+// ========== PENDIENTES ==========
+
+// Rutas específicas PRIMERO (antes de las que tienen :id)
+app.get('/api/pendientes/cats', (req, res) => {
+  const cats = db.prepare("SELECT DISTINCT categoria FROM pendientes WHERE categoria IS NOT NULL AND categoria != ''").all();
+  res.json(cats.map(c => c.categoria));
+});
+
+app.get('/api/pendientes/all', (req, res) => {
+  const pendientes = db.prepare('SELECT * FROM pendientes').all();
+  const resultado = pendientes.map(p => ({
+    id: p.id,
+    fecha: p.fecha ? String(p.fecha).split('/')[0] : '—',
+    descripcion: p.descripcion,
+    montoMensual: p.monto_mensual,
+    abono: p.abono || 0,
+    faltante: Math.max(p.monto_mensual - (p.abono || 0), 0),
+    categoria: p.categoria || 'Sin categoría',
+    pagado: p.pagado || ''
+  }));
+  res.json(resultado);
+});
+
+app.get('/api/pendientes', (req, res) => {
+  const pendientes = db.prepare("SELECT * FROM pendientes WHERE pagado != 'OK'").all();
+  const resultado = pendientes
+    .filter(p => p.monto_mensual > 0)
+    .map(p => ({
+      id: p.id,
+      fecha: p.fecha ? String(p.fecha).split('/')[0] : '—',
+      descripcion: p.descripcion,
+      montoMensual: p.monto_mensual,
+      abono: p.abono || 0,
+      faltante: p.monto_mensual - (p.abono || 0),
+      categoria: p.categoria || 'Sin categoría'
+    }))
+    .sort((a, b) => parseInt(a.fecha) - parseInt(b.fecha));
+  res.json(resultado);
+});
+
+app.post('/api/pendientes/nuevo', (req, res) => {
+  const { fecha, descripcion, montoMensual, categoria } = req.body;
+  if (!descripcion || !montoMensual) return res.json({ success: false, message: 'Faltan datos' });
+  db.prepare("INSERT INTO pendientes (fecha, descripcion, monto_mensual, abono, restante, pagado, categoria) VALUES (?, ?, ?, 0, ?, '', ?)")
+    .run(fecha || '', descripcion.toUpperCase(), parseFloat(montoMensual), parseFloat(montoMensual), categoria || '');
+  res.json({ success: true });
+});
+
+app.post('/api/pendientes/reiniciar', (req, res) => {
+  const pendientes = db.prepare('SELECT * FROM pendientes').all();
+  pendientes.forEach(p => {
+    db.prepare("UPDATE pendientes SET abono=0, restante=?, pagado='' WHERE id=?")
+      .run(p.monto_mensual, p.id);
+  });
+  res.json({ success: true, message: 'Abonos reiniciados correctamente' });
+});
+
+app.put('/api/pendientes/abono', (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items)) return res.json({ success: false, message: 'Se espera un array' });
+  let updatedCount = 0;
+  items.forEach(item => {
+    if (!item.id || !item.incrementoAbono) return;
+    const p = db.prepare('SELECT * FROM pendientes WHERE id = ?').get(item.id);
+    if (!p) return;
+    const nuevoAbono = (p.abono || 0) + parseFloat(item.incrementoAbono);
+    const restante = Math.max(p.monto_mensual - nuevoAbono, 0);
+    const pagado = restante <= 0 ? 'OK' : '';
+    db.prepare('UPDATE pendientes SET abono=?, restante=?, pagado=? WHERE id=?')
+      .run(nuevoAbono, restante, pagado, p.id);
+    updatedCount++;
+  });
+  res.json({ success: true, updatedCount });
+});
+
+app.post('/api/pendientes', (req, res) => {
+  const { fecha, descripcion, montoMensual, categoria } = req.body;
+  if (!descripcion || !montoMensual) return res.json({ success: false, message: 'Faltan datos' });
+  db.prepare("INSERT INTO pendientes (fecha, descripcion, monto_mensual, abono, restante, pagado, categoria) VALUES (?, ?, ?, 0, ?, '', ?)")
+    .run(fecha, descripcion, parseFloat(montoMensual), parseFloat(montoMensual), categoria || '');
+  res.json({ success: true });
+});
+
+// Rutas con :id AL FINAL
+app.put('/api/pendientes/:id', (req, res) => {
+  const { id } = req.params;
+  const { fecha, descripcion, montoMensual, categoria } = req.body;
+  const p = db.prepare('SELECT * FROM pendientes WHERE id = ?').get(parseInt(id));
+  if (!p) return res.json({ success: false, message: 'No encontrado' });
+  const nuevoRestante = Math.max(parseFloat(montoMensual) - (p.abono || 0), 0);
+  const pagado = nuevoRestante <= 0 ? 'OK' : '';
+  db.prepare('UPDATE pendientes SET fecha=?, descripcion=?, monto_mensual=?, restante=?, pagado=?, categoria=? WHERE id=?')
+    .run(fecha, descripcion.toUpperCase(), parseFloat(montoMensual), nuevoRestante, pagado, categoria, parseInt(id));
+  res.json({ success: true });
+});
+
+app.delete('/api/pendientes/categoria/:nombre', (req, res) => {
+  db.prepare('DELETE FROM pendientes WHERE categoria = ?').run(req.params.nombre);
+  res.json({ success: true });
+});
+
+app.delete('/api/pendientes/:id', (req, res) => {
+  db.prepare('DELETE FROM pendientes WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ success: true });
+});
 // ========== INICIO ==========
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

@@ -13,9 +13,8 @@
 </head>
 
 <body>
-  <div class="header" id="headerCuentas">
+  <div class="header" id="headerCuentas"></div>
   <button class="btn-config" id="btnConfig">⚙️</button>
-  </div>
 
   <div class="tablas-wrapper">
     <div class="tabla-container">
@@ -132,12 +131,6 @@
         <button class="btn-config-opcion" onclick="abrirSeccion('pendientes')">
           📋 Pendientes por Pago
         </button>
-        <button class="btn-config-opcion" onclick="abrirSeccion('categorias')">
-          🏷️ Categorías
-        </button>
-        <button class="btn-config-opcion" onclick="abrirSeccion('subcategorias')">
-          🔖 Subcategorías
-        </button>
       </div>
 
       <div class="modal-buttons">
@@ -145,7 +138,92 @@
       </div>
     </div>
   </div>
+  <!-- MODAL CUENTAS -->
+  <div id="modalCuentas" class="modal">
+    <div class="modal-content">
+      <h2>Cuentas</h2>
 
+      <div id="listaCuentas" style="margin-bottom:20px;"></div>
+
+      <label>Nueva cuenta:</label>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <input type="text" id="nuevaCuenta" placeholder="Ej: NEQUI" 
+          style="flex:1;padding:14px;border-radius:12px;border:2px solid #ddd;font-size:16px;">
+        <button id="btnAgregarCuenta"
+          style="background:#004481;color:white;border:none;border-radius:12px;padding:14px 20px;font-size:16px;cursor:pointer;">
+          + Agregar
+        </button>
+      </div>
+
+      <div class="modal-buttons" style="margin-top:20px;">
+        <button id="btnCerrarCuentas" style="background-color:#666;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GESTIONAR PENDIENTES -->
+  <div id="modalGestionPendientes" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Pendientes</h2>
+        <button onclick="mostrarFormNuevoPendiente()"
+          style="background:#004481;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;">
+          + Nuevo
+        </button>
+      </div>
+
+      <!-- FORMULARIO NUEVO/EDITAR PENDIENTE -->
+      <div id="formPendiente" style="display:none;background:#f0f4f8;border-radius:12px;padding:15px;margin-top:15px;">
+        <h3 id="tituloPendienteForm" style="margin:0 0 15px 0;color:#004481;">Nuevo Pendiente</h3>
+        <input type="hidden" id="pendienteEditId">
+        
+        <label>Descripción:</label>
+        <input type="text" id="pendienteDesc" placeholder="Ej: NETFLIX"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Monto Mensual:</label>
+        <input type="number" id="pendienteMonto" placeholder="0"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Fecha de vencimiento:</label>
+        <input type="text" id="pendienteFecha" placeholder="Ej: 15 o 15-30"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Categoría:</label>
+        <div style="display:flex;gap:8px;">
+          <select id="pendienteCategoria"
+            style="flex:1;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;"></select>
+          <button onclick="mostrarInputNuevaCategoria()"
+            style="background:#004481;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;cursor:pointer;">
+            + Nueva
+          </button>
+        </div>
+
+        <div id="inputNuevaCategoria" style="display:none;margin-top:10px;">
+          <input type="text" id="nuevaCategoriaP" placeholder="Nueva categoría"
+            style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;">
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:15px;">
+          <button onclick="guardarPendiente()"
+            style="flex:1;background:#004481;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
+            Guardar
+          </button>
+          <button onclick="cancelarFormPendiente()"
+            style="flex:1;background:#666;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      <!-- LISTA DE PENDIENTES AGRUPADOS -->
+      <div id="listaGestionPendientes" style="margin-top:15px;"></div>
+
+      <div class="modal-buttons" style="margin-top:10px;">
+        <button id="btnCerrarGestionPendientes" style="background-color:#666;">Cerrar</button>
+      </div>
+    </div>
+  </div>
   <script src="js.js"></script>
 </body>
 </html>

@@ -598,5 +598,245 @@ document.getElementById('modalConfig').addEventListener('click', (e) => {
 
 function abrirSeccion(seccion) {
   document.getElementById('modalConfig').style.display = 'none';
-  alert(`Sección ${seccion} - próximamente`);
+  if (seccion === 'cuentas') abrirModalCuentas();
+  if (seccion === 'pendientes') abrirModalGestionPendientes();
 }
+
+// ===== MODAL CUENTAS =====
+function abrirModalCuentas() {
+  document.getElementById('modalCuentas').style.display = 'block';
+  cargarListaCuentas();
+}
+
+function cargarListaCuentas() {
+  fetch(`${API}/api/cuentas`)
+    .then(r => r.json())
+    .then(cuentas => {
+      const lista = document.getElementById('listaCuentas');
+      lista.innerHTML = cuentas.map(c => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eee;">
+          <span style="font-size:17px;font-weight:500;">${c}</span>
+          <button onclick="eliminarCuenta('${c}')" 
+            style="background:#cc0000;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:14px;cursor:pointer;">
+            🗑 Eliminar
+          </button>
+        </div>
+      `).join('');
+    });
+}
+
+function eliminarCuenta(nombre) {
+  if (!confirm(`¿Eliminar la cuenta "${nombre}"?`)) return;
+  fetch(`${API}/api/cuentas/${nombre}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        alert('Cuenta eliminada ✅');
+        cargarListaCuentas();
+        cargarCuentas(() => cargarTotales());
+      } else {
+        alert('Error al eliminar');
+      }
+    });
+}
+
+document.getElementById('btnAgregarCuenta').addEventListener('click', () => {
+  const input = document.getElementById('nuevaCuenta');
+  const nombre = input.value.trim().toUpperCase();
+  if (!nombre) { alert('Escribe el nombre de la cuenta'); return; }
+
+  fetch(`${API}/api/cuentas`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ nombre })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      alert('Cuenta agregada ✅');
+      input.value = '';
+      cargarListaCuentas();
+      cargarCuentas(() => cargarTotales());
+    } else {
+      alert('Error: ' + res.message);
+    }
+  });
+});
+
+document.getElementById('btnCerrarCuentas').addEventListener('click', () => {
+  document.getElementById('modalCuentas').style.display = 'none';
+});
+
+// ===== GESTIÓN PENDIENTES =====
+function abrirModalGestionPendientes() {
+  document.getElementById('modalGestionPendientes').style.display = 'block';
+  cargarGestionPendientes();
+}
+
+function cargarGestionPendientes() {
+  fetch(`${API}/api/pendientes/cats`)
+    .then(r => r.json())
+    .then(cats => {
+      // Cargar categorías en el select
+      const select = document.getElementById('pendienteCategoria');
+      select.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    });
+
+    fetch(`${API}/api/pendientes/all`)
+    .then(r => r.json())
+    .then(pendientes => {
+      const lista = document.getElementById('listaGestionPendientes');
+
+      if (!pendientes.length) {
+        lista.innerHTML = '<div class="mensaje-vacio">No hay pendientes</div>';
+        return;
+      }
+
+      // Agrupar por categoría
+      const grupos = {};
+      pendientes.forEach(p => {
+        const cat = p.categoria || 'Sin categoría';
+        if (!grupos[cat]) grupos[cat] = [];
+        grupos[cat].push(p);
+      });
+
+      let html = '';
+      Object.keys(grupos).sort((a,b) => a.localeCompare(b,'es',{sensitivity:'base'})).forEach(cat => {
+        html += `
+          <div style="margin-bottom:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#004481;color:white;padding:12px 15px;border-radius:10px 10px 0 0;">
+              <span style="font-weight:600;font-size:16px;">${cat}</span>
+              <button onclick="eliminarCategoriaPendiente('${cat}')"
+                style="background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">
+                🗑 Eliminar sección
+              </button>
+            </div>
+            <div style="background:white;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+              ${grupos[cat].map(p => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 15px;border-bottom:1px solid #f0f0f0;">
+                  <div>
+                    <div style="font-weight:600;font-size:15px;">${escapeHtml(p.descripcion)}</div>
+                    <div style="font-size:13px;color:#666;">$${p.montoMensual.toLocaleString('es-CO')} · Vence: ${p.fecha} ${p.pagado === 'OK' ? '✅' : '⏳'}</div>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <button onclick="editarPendienteForm(${p.id},'${escapeHtml(p.descripcion)}',${p.montoMensual},'${p.fecha}','${p.categoria}')"
+                      style="background:#ffa500;color:white;border:none;border-radius:8px;padding:8px 10px;font-size:14px;cursor:pointer;">✎</button>
+                    <button onclick="eliminarPendienteById(${p.id})"
+                      style="background:#cc0000;color:white;border:none;border-radius:8px;padding:8px 10px;font-size:14px;cursor:pointer;">🗑</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      });
+
+      lista.innerHTML = html;
+    });
+}
+
+function mostrarFormNuevoPendiente() {
+  document.getElementById('pendienteEditId').value = '';
+  document.getElementById('pendienteDesc').value = '';
+  document.getElementById('pendienteMonto').value = '';
+  document.getElementById('pendienteFecha').value = '';
+  document.getElementById('tituloPendienteForm').textContent = 'Nuevo Pendiente';
+  document.getElementById('inputNuevaCategoria').style.display = 'none';
+  document.getElementById('nuevaCategoriaP').value = '';
+
+  // Recargar categorías antes de mostrar el form
+  fetch(`${API}/api/pendientes/cats`)
+    .then(r => r.json())
+    .then(cats => {
+      const select = document.getElementById('pendienteCategoria');
+      select.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      document.getElementById('formPendiente').style.display = 'block';
+    });
+}
+
+function editarPendienteForm(id, desc, monto, fecha, categoria) {
+  document.getElementById('pendienteEditId').value = id;
+  document.getElementById('pendienteDesc').value = desc;
+  document.getElementById('pendienteMonto').value = monto;
+  document.getElementById('pendienteFecha').value = fecha;
+  document.getElementById('pendienteCategoria').value = categoria;
+  document.getElementById('tituloPendienteForm').textContent = 'Editar Pendiente';
+  document.getElementById('formPendiente').style.display = 'block';
+  document.getElementById('inputNuevaCategoria').style.display = 'none';
+  document.getElementById('formPendiente').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarFormPendiente() {
+  document.getElementById('formPendiente').style.display = 'none';
+}
+
+function mostrarInputNuevaCategoria() {
+  document.getElementById('inputNuevaCategoria').style.display = 'block';
+}
+
+function guardarPendiente() {
+  const id = document.getElementById('pendienteEditId').value;
+  const descripcion = document.getElementById('pendienteDesc').value.trim();
+  const montoMensual = parseFloat(document.getElementById('pendienteMonto').value || 0);
+  const fecha = document.getElementById('pendienteFecha').value.trim();
+  const nuevaCat = document.getElementById('nuevaCategoriaP').value.trim().toUpperCase();
+  const categoria = nuevaCat || document.getElementById('pendienteCategoria').value;
+
+  if (!descripcion || montoMensual <= 0) {
+    alert('Completa descripción y monto'); return;
+  }
+
+  const datos = { fecha, descripcion, montoMensual, categoria };
+  const url = id ? `${API}/api/pendientes/${id}` : `${API}/api/pendientes/nuevo`;
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(datos)
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      alert(id ? 'Pendiente actualizado ✅' : 'Pendiente agregado ✅');
+      document.getElementById('formPendiente').style.display = 'none';
+      document.getElementById('nuevaCategoriaP').value = '';
+      cargarGestionPendientes();
+      cargarPendientes();
+    } else {
+      alert('Error: ' + res.message);
+    }
+  });
+}
+
+function eliminarPendienteById(id) {
+  if (!confirm('¿Eliminar este pendiente?')) return;
+  fetch(`${API}/api/pendientes/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        alert('Pendiente eliminado ✅');
+        cargarGestionPendientes();
+        cargarPendientes();
+      }
+    });
+}
+
+function eliminarCategoriaPendiente(cat) {
+  if (!confirm(`¿Eliminar la sección "${cat}" y todos sus pendientes?`)) return;
+  fetch(`${API}/api/pendientes/categoria/${encodeURIComponent(cat)}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        alert(`Sección "${cat}" eliminada ✅`);
+        cargarGestionPendientes();
+        cargarPendientes();
+      }
+    });
+}
+
+document.getElementById('btnCerrarGestionPendientes').addEventListener('click', () => {
+  document.getElementById('modalGestionPendientes').style.display = 'none';
+});
+
+// Actualizar abrirSeccion para pendientes
+const _abrirSeccionOriginal = abrirSeccion;

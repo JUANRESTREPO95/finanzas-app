@@ -566,19 +566,25 @@ body {
   position: fixed;
   top: 15px;
   right: 15px;
-  width: 45px;
-  height: 45px;
+  width: 38px;
+  height: 38px;
   border: none;
   border-radius: 50%;
-  background-color: white;
-  font-size: 24px;
+  background-color: rgba(255,255,255,0.3);
+  font-size: 20px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: none;
   z-index: 99;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.3s ease;
+  opacity: 0.5;
+}
+
+.btn-config:active {
+  opacity: 1;
+  transform: rotate(90deg);
 }
 
 .btn-config:active {
