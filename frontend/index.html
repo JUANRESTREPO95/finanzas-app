@@ -13,7 +13,9 @@
 </head>
 
 <body>
-  <div class="header" id="headerCuentas"></div>
+  <div class="header" id="headerCuentas">
+  <button class="btn-config" id="btnConfig">⚙️</button>
+  </div>
 
   <div class="tablas-wrapper">
     <div class="tabla-container">
@@ -115,6 +117,31 @@
       <div class="modal-buttons">
         <button id="btnGuardarAbonos" style="background-color:#004481;">Guardar Abonos</button>
         <button id="btnCancelarPendiente" style="background-color:#666;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL CONFIGURACION -->
+  <div id="modalConfig" class="modal">
+    <div class="modal-content">
+      <h2>Configuración</h2>
+      
+      <div class="config-opciones">
+        <button class="btn-config-opcion" onclick="abrirSeccion('cuentas')">
+          💳 Cuentas
+        </button>
+        <button class="btn-config-opcion" onclick="abrirSeccion('pendientes')">
+          📋 Pendientes por Pago
+        </button>
+        <button class="btn-config-opcion" onclick="abrirSeccion('categorias')">
+          🏷️ Categorías
+        </button>
+        <button class="btn-config-opcion" onclick="abrirSeccion('subcategorias')">
+          🔖 Subcategorías
+        </button>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnCerrarConfig" style="background-color:#666;">Cerrar</button>
       </div>
     </div>
   </div>

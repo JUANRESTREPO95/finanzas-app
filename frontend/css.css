@@ -560,3 +560,54 @@ body {
 .btn-eliminar:active {
   transform: scale(0.9);
 }
+
+/* BOTÓN CONFIGURACIÓN */
+.btn-config {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  width: 45px;
+  height: 45px;
+  border: none;
+  border-radius: 50%;
+  background-color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 99;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.btn-config:active {
+  transform: rotate(90deg);
+}
+
+/* OPCIONES DE CONFIGURACIÓN */
+.config-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-config-opcion {
+  width: 100%;
+  padding: 18px;
+  border: none;
+  border-radius: 12px;
+  background-color: #f0f4f8;
+  color: #004481;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.btn-config-opcion:active {
+  background-color: #004481;
+  color: white;
+}

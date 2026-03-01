@@ -580,3 +580,23 @@ function refrescarDatos() {
   cargarTotales(); cargarMovimientos(true); cargarPendientes();
   setTimeout(() => { msg.style.opacity='0'; setTimeout(() => document.body.removeChild(msg), 300); }, 1500);
 }
+
+// ===== CONFIGURACIÓN =====
+document.getElementById('btnConfig').addEventListener('click', () => {
+  document.getElementById('modalConfig').style.display = 'block';
+});
+
+document.getElementById('btnCerrarConfig').addEventListener('click', () => {
+  document.getElementById('modalConfig').style.display = 'none';
+});
+
+document.getElementById('modalConfig').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modalConfig')) {
+    document.getElementById('modalConfig').style.display = 'none';
+  }
+});
+
+function abrirSeccion(seccion) {
+  document.getElementById('modalConfig').style.display = 'none';
+  alert(`Sección ${seccion} - próximamente`);
+}
