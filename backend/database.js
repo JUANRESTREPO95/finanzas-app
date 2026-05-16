@@ -11,7 +11,8 @@ db.exec(`
     descripcion TEXT,
     categoria TEXT,
     monto REAL NOT NULL,
-    cuenta TEXT NOT NULL
+    cuenta TEXT NOT NULL,
+    created_at INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS salidas (
@@ -19,7 +20,8 @@ db.exec(`
     fecha_hora TEXT NOT NULL,
     descripcion TEXT,
     monto REAL NOT NULL,
-    cuenta TEXT NOT NULL
+    cuenta TEXT NOT NULL,
+    created_at INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS pendientes (

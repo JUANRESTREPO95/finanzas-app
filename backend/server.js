@@ -72,13 +72,24 @@ app.get('/api/totales/sin-ahorros', (req, res) => {
   res.json({ total });
 });
 
+// ========== MIGRACIONES ==========
+try {
+  db.exec(`ALTER TABLE ingresos ADD COLUMN created_at INTEGER DEFAULT 0;`);
+  db.exec(`UPDATE ingresos SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
+} catch(e) {}
+try {
+  db.exec(`ALTER TABLE salidas ADD COLUMN created_at INTEGER DEFAULT 0;`);
+  db.exec(`UPDATE salidas SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
+} catch(e) {}
+
 // ========== INGRESOS ==========
 app.post('/api/ingresos', (req, res) => {
-  const { fecha, hora, descripcion, categoria, monto, cuenta } = req.body;
+  const { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
   const fechaHora = `${fecha} ${hora}`;
-  db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, categoria, monto, cuenta) VALUES (?, ?, ?, ?, ?)')
-    .run(fechaHora, descripcion, categoria, parseFloat(monto), cuenta);
+  const createdAt = Math.floor(Date.now() / 1000);
+  db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt);
   res.json({ success: true });
 });
 
@@ -87,8 +98,9 @@ app.post('/api/salidas', (req, res) => {
   const { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
   const fechaHora = `${fecha} ${hora}`;
-  db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta) VALUES (?, ?, ?, ?)')
-    .run(fechaHora, descripcion, parseFloat(monto), cuenta);
+  const createdAt = Math.floor(Date.now() / 1000);
+  db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt);
   res.json({ success: true });
 });
 
@@ -104,8 +116,8 @@ app.get('/api/movimientos', (req, res) => {
       monto: i.monto,
       detalle: i.descripcion,
       cuenta: i.cuenta,
-      categoria: i.categoria,
-      id: i.id
+      id: i.id,
+      createdAt: i.created_at
     })),
     ...salidas.map(s => ({
       fechaHora: s.fecha_hora,
@@ -113,11 +125,12 @@ app.get('/api/movimientos', (req, res) => {
       monto: s.monto,
       detalle: s.descripcion,
       cuenta: s.cuenta,
-      id: s.id
+      id: s.id,
+      createdAt: s.created_at
     }))
   ];
 
-  movimientos.sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora));
+  movimientos.sort((a, b) => b.createdAt - a.createdAt);
   res.json(movimientos);
 });
 
@@ -136,8 +149,8 @@ app.put('/api/movimientos/:tipo/:id', (req, res) => {
   const fechaHora = `${fecha} ${hora}`;
 
   if (tipo === 'INGRESO') {
-    db.prepare('UPDATE ingresos SET fecha_hora=?, descripcion=?, categoria=?, monto=?, cuenta=? WHERE id=?')
-      .run(fechaHora, descripcion, categoria, parseFloat(monto), cuenta, parseInt(id));
+    db.prepare('UPDATE ingresos SET fecha_hora=?, descripcion=?, monto=?, cuenta=? WHERE id=?')
+      .run(fechaHora, descripcion, parseFloat(monto), cuenta, parseInt(id));
   } else {
     db.prepare('UPDATE salidas SET fecha_hora=?, descripcion=?, monto=?, cuenta=? WHERE id=?')
       .run(fechaHora, descripcion, parseFloat(monto), cuenta, parseInt(id));
@@ -150,13 +163,14 @@ app.post('/api/transferencia', (req, res) => {
   const { cuentaOrigen, cuentaDestino, monto, descripcion } = req.body;
   if (cuentaOrigen === cuentaDestino) return res.json({ success: false, message: 'Cuentas iguales' });
   const fechaHora = new Date().toISOString();
+  const createdAt = Math.floor(Date.now() / 1000);
   const desc = descripcion || 'Transferencia';
 
-  db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta) VALUES (?, ?, ?, ?)')
-    .run(fechaHora, desc, parseFloat(monto), cuentaOrigen);
+  db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(fechaHora, desc, parseFloat(monto), cuentaOrigen, createdAt);
 
-  db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, categoria, monto, cuenta) VALUES (?, ?, ?, ?, ?)')
-    .run(fechaHora, desc, 'TRANSFERENCIA', parseFloat(monto), cuentaDestino);
+  db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(fechaHora, desc, parseFloat(monto), cuentaDestino, createdAt);
 
   res.json({ success: true });
 });
