@@ -264,7 +264,6 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', function(
     fecha: document.getElementById('ingresoFecha').value,
     hora: obtenerHoraActual(),
     descripcion: document.getElementById('ingresoDescripcion').value.trim(),
-    categoria: document.getElementById('ingresoCategoria').value,
     monto: parseFloat(document.getElementById('ingresoMonto').value || 0),
     cuenta: document.getElementById('ingresoCuenta').value
   };
@@ -365,7 +364,6 @@ function actualizarMovimiento() {
     fecha: document.getElementById('ingresoFecha').value,
     hora: obtenerHoraActual(),
     descripcion: document.getElementById('ingresoDescripcion').value.trim(),
-    categoria: document.getElementById('ingresoCategoria').value,
     monto: parseFloat(document.getElementById('ingresoMonto').value || 0),
     cuenta: document.getElementById('ingresoCuenta').value
   } : {
