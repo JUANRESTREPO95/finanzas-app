@@ -12,15 +12,15 @@ app.use(express.static(path.join(__dirname, 'frontend')));
 
 // ========== CUENTAS ==========
 app.get('/api/cuentas', (req, res) => {
-  const cuentas = db.prepare('SELECT nombre FROM cuentas').all();
-  res.json(cuentas.map(c => c.nombre));
+  const cuentas = db.prepare('SELECT nombre, incluir_en_total FROM cuentas').all();
+  res.json(cuentas);
 });
 
 app.post('/api/cuentas', (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.json({ success: false, message: 'Falta el nombre' });
   try {
-    db.prepare('INSERT INTO cuentas (nombre) VALUES (?)').run(nombre.toUpperCase());
+    db.prepare('INSERT INTO cuentas (nombre, incluir_en_total) VALUES (?, 1)').run(nombre.toUpperCase());
     res.json({ success: true });
   } catch (e) {
     res.json({ success: false, message: 'Ya existe esa cuenta' });
@@ -31,6 +31,14 @@ app.post('/api/cuentas', (req, res) => {
 app.delete('/api/cuentas/:nombre', (req, res) => {
   const { nombre } = req.params;
   db.prepare('DELETE FROM cuentas WHERE nombre = ?').run(nombre);
+  res.json({ success: true });
+});
+
+// Toggle visibilidad en total
+app.put('/api/cuentas/:nombre/visible', (req, res) => {
+  const { nombre } = req.params;
+  const { incluir } = req.body;
+  db.prepare('UPDATE cuentas SET incluir_en_total = ? WHERE nombre = ?').run(incluir ? 1 : 0, nombre);
   res.json({ success: true });
 });
 
@@ -65,9 +73,10 @@ app.get('/api/totales/sin-ahorros', (req, res) => {
   db.prepare('SELECT monto, cuenta FROM salidas').all()
     .forEach(s => { if (totalesRes.hasOwnProperty(s.cuenta)) totalesRes[s.cuenta] -= s.monto; });
 
+  const visibles = db.prepare('SELECT nombre FROM cuentas WHERE incluir_en_total = 1').all().map(c => c.nombre);
   let total = 0;
   for (let cuenta in totalesRes) {
-    if (cuenta.toUpperCase() !== 'AHORROS') total += totalesRes[cuenta];
+    if (visibles.includes(cuenta)) total += totalesRes[cuenta];
   }
   res.json({ total });
 });
@@ -80,6 +89,10 @@ try {
 try {
   db.exec(`ALTER TABLE salidas ADD COLUMN created_at INTEGER DEFAULT 0;`);
   db.exec(`UPDATE salidas SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
+} catch(e) {}
+try {
+  db.exec(`ALTER TABLE cuentas ADD COLUMN incluir_en_total INTEGER DEFAULT 1;`);
+  db.exec(`UPDATE cuentas SET incluir_en_total = 0 WHERE nombre = 'AHORROS' AND incluir_en_total = 1;`);
 } catch(e) {}
 
 // ========== INGRESOS ==========

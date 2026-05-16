@@ -38,23 +38,23 @@ function cargarCuentas(callback) {
       const header = document.getElementById('headerCuentas');
       const cuentasHTML = cuentas.map(c =>
         `<div class="cuenta">
-          <div>${c}</div>
-          <div id="total_${c.replace(/\s+/g,'_')}" class="monto">$0</div>
+          <div>${c.nombre}</div>
+          <div id="total_${c.nombre.replace(/\s+/g,'_')}" class="monto">$0</div>
         </div>`
       ).join('<div class="divider"></div>');
 
       header.innerHTML = `
         <div class="cuentas-row">${cuentasHTML}</div>
         <div class="total-sin-ahorros">
-          <div>Total disponible (sin ahorros)</div>
+          <div>Total disponible</div>
           <div id="totalSinAhorros" class="total-sin-ahorros-monto">$0</div>
         </div>`;
 
       ['ingresoCuenta','salidaCuenta','transferenciaCuentaOrigen','transferenciaCuentaDestino'].forEach(id => {
-        document.getElementById(id).innerHTML = cuentas.map(c => `<option value="${c}">${c}</option>`).join('');
+        document.getElementById(id).innerHTML = cuentas.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
       });
 
-      window.listaCuentas = cuentas;
+      window.listaCuentas = cuentas.map(c => c.nombre);
       if (callback) callback();
     });
 }
@@ -589,8 +589,13 @@ function cargarListaCuentas() {
       const lista = document.getElementById('listaCuentas');
       lista.innerHTML = cuentas.map(c => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eee;">
-          <span style="font-size:17px;font-weight:500;">${c}</span>
-          <button onclick="eliminarCuenta('${c}')" 
+          <div style="display:flex;align-items:center;gap:10px;flex:1;">
+            <input type="checkbox" data-cuenta="${c.nombre}" ${c.incluir_en_total ? 'checked' : ''}
+              onchange="toggleCuentaVisible('${c.nombre}', this.checked)"
+              style="width:20px;height:20px;cursor:pointer;">
+            <span style="font-size:17px;font-weight:500;">${c.nombre}</span>
+          </div>
+          <button onclick="eliminarCuenta('${c.nombre}')" 
             style="background:#cc0000;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:14px;cursor:pointer;">
             🗑 Eliminar
           </button>
@@ -599,9 +604,23 @@ function cargarListaCuentas() {
     });
 }
 
+function toggleCuentaVisible(nombre, incluir) {
+  fetch(`${API}/api/cuentas/${encodeURIComponent(nombre)}/visible`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ incluir })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      cargarTotales();
+    }
+  });
+}
+
 function eliminarCuenta(nombre) {
   if (!confirm(`¿Eliminar la cuenta "${nombre}"?`)) return;
-  fetch(`${API}/api/cuentas/${nombre}`, { method: 'DELETE' })
+  fetch(`${API}/api/cuentas/${encodeURIComponent(nombre)}`, { method: 'DELETE' })
     .then(r => r.json())
     .then(res => {
       if (res.success) {

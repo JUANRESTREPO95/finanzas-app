@@ -39,7 +39,8 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS cuentas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL UNIQUE
+    nombre TEXT NOT NULL UNIQUE,
+    incluir_en_total INTEGER DEFAULT 1
   );
 `);
 
