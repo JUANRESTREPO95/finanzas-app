@@ -1,3 +1,43 @@
+:root {
+  --bg-primary: #f7f7f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f4f8;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --accent: #004481;
+  --accent-dark: #003366;
+  --accent-danger: #cc0000;
+  --accent-success: #00a854;
+  --accent-warning: #ffa500;
+  --accent-purple: #9b59b6;
+  --border: #e0e0e0;
+  --border-light: #f0f0f0;
+  --input-bg: #f9f9f9;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-heavy: rgba(0, 0, 0, 0.3);
+}
+
+body.dark {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2a2a2a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #aaaaaa;
+  --text-muted: #777777;
+  --accent: #4da6ff;
+  --accent-dark: #3d8bdc;
+  --accent-danger: #ff4444;
+  --accent-success: #00cc66;
+  --accent-warning: #ffb84d;
+  --accent-purple: #b07cc6;
+  --border: #333333;
+  --border-light: #2a2a2a;
+  --input-bg: #2a2a2a;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-heavy: rgba(0, 0, 0, 0.5);
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -7,28 +47,29 @@ body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: #f7f7f7;
+  background-color: var(--bg-primary);
   overflow-x: hidden;
   overflow-y: auto;
   position: relative;
   width: 100%;
   min-height: 100vh;
+  transition: background-color 0.3s ease;
 }
 
-/* ENCABEZADO PRINCIPAL - Ajustado para iPhone 14 Pro Max */
 .header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: white;
-  color: #004481;
+  background-color: var(--bg-secondary);
+  color: var(--accent);
   font-size: 20px;
   font-weight: 700;
   padding: 20px 10px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--border);
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .cuentas-row {
@@ -40,25 +81,24 @@ body {
   width: 100%;
 }
 
-
 .total-sin-ahorros {
   margin-top: 15px;
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   text-align: center;
 }
 
 .total-sin-ahorros-monto {
   font-size: 20px;
   font-weight: 700;
-  color: #004481;
+  color: var(--accent);
   margin-top: 3px;
 }
 
 .divider {
   width: 2px;
   height: 50px;
-  background-color: #d1d1d1;
+  background-color: var(--border);
 }
 
 .cuenta {
@@ -71,11 +111,10 @@ body {
 .monto {
   font-size: 24px;
   font-weight: 700;
-  color: #333;
+  color: var(--text-primary);
   margin-top: 5px;
 }
 
-/* ✅ NUEVO: MENÚ FLOTANTE */
 .floating-menu {
   position: fixed;
   bottom: 40px;
@@ -91,9 +130,9 @@ body {
   font-size: 32px;
   font-weight: bold;
   color: white;
-  background-color: #004481;
+  background-color: var(--accent);
   cursor: pointer;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 15px var(--shadow-heavy);
   transition: transform 0.3s ease, background-color 0.3s ease;
   display: flex;
   align-items: center;
@@ -105,7 +144,7 @@ body {
 }
 
 .btn-menu-principal.active {
-  background-color: #cc0000;
+  background-color: var(--accent-danger);
   transform: rotate(45deg);
 }
 
@@ -136,9 +175,9 @@ body {
   font-size: 28px;
   font-weight: bold;
   color: white;
-  background-color: #004481;
+  background-color: var(--accent);
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow-heavy);
   transition: transform 0.15s ease;
   display: flex;
   align-items: center;
@@ -150,25 +189,23 @@ body {
 }
 
 .btn-float.minus {
-  background-color: #cc0000;
+  background-color: var(--accent-danger);
 }
 
 .btn-float.edit {
-  background-color: #ffa500;
+  background-color: var(--accent-warning);
 }
 
 .btn-float.transfer {
-  background-color: #9b59b6;
+  background-color: var(--accent-purple);
   font-size: 32px;
 }
 
-/* ✅ NUEVO: Botón de refrescar */
 .btn-float.refresh {
-  background-color: #27ae60;
+  background-color: var(--accent-success);
   font-size: 36px;
 }
 
-/* MODAL - Optimizado para móvil */
 .modal {
   display: none;
   position: fixed;
@@ -183,18 +220,19 @@ body {
 }
 
 .modal-content {
-  background-color: #fff;
+  background-color: var(--bg-secondary);
   margin: 30px auto;
   padding: 30px 25px;
   border-radius: 20px;
   width: 90%;
   max-width: 500px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px var(--shadow-heavy);
+  transition: background-color 0.3s ease;
 }
 
 .modal-content h2 {
   text-align: center;
-  color: #004481;
+  color: var(--accent);
   margin: 0 0 25px 0;
   font-size: 28px;
 }
@@ -205,28 +243,29 @@ body {
   margin-bottom: 8px;
   font-weight: 600;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
 }
 
-/* INPUTS OPTIMIZADOS - Font-size 16px evita el zoom automático en iOS */
 .modal-content input,
 .modal-content select {
   width: 100%;
   padding: 16px 12px;
   border-radius: 12px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border);
   font-size: 16px;
   box-sizing: border-box;
   -webkit-appearance: none;
   appearance: none;
-  background-color: #f9f9f9;
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .modal-content input:focus,
 .modal-content select:focus {
   outline: none;
-  border-color: #004481;
-  background-color: white;
+  border-color: var(--accent);
+  background-color: var(--bg-secondary);
 }
 
 .modal-content input[type="checkbox"] {
@@ -240,11 +279,15 @@ body {
 }
 
 .modal-content select {
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 20px;
   padding-right: 40px;
+}
+
+body.dark .modal-content select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
 }
 
 .modal-buttons {
@@ -270,22 +313,21 @@ body {
 }
 
 #btnGuardarIngreso {
-  background-color: #004481;
+  background-color: var(--accent);
 }
 
 #btnCancelarIngreso {
-  background-color: #cc0000;
+  background-color: var(--accent-danger);
 }
 
 #btnGuardarSalida {
-  background-color: #cc0000;
+  background-color: var(--accent-danger);
 }
 
 #btnCancelarSalida {
-  background-color: #666;
+  background-color: var(--text-secondary);
 }
 
-/* CONTENEDOR DE DOS TABLAS */
 .tablas-wrapper {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -294,13 +336,11 @@ body {
   padding-bottom: 200px;
 }
 
-/* TABLA DE MOVIMIENTOS */
 .tabla-container {
   display: flex;
   flex-direction: column;
 }
 
-/* Responsive: En móvil las tablas van una debajo de la otra */
 @media (max-width: 768px) {
   .tablas-wrapper {
     grid-template-columns: 1fr;
@@ -309,31 +349,31 @@ body {
 
 .tabla-titulo {
   text-align: center;
-  color: #004481;
+  color: var(--accent);
   font-size: 24px;
   font-weight: 700;
   margin-bottom: 15px;
 }
 
 .tabla-movimientos {
-  background-color: white;
+  background-color: var(--bg-secondary);
   border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--shadow);
 }
 
 .movimiento-item {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   padding: 18px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-light);
   transition: background-color 0.2s;
-  gap: 20px;
+  gap: 15px;
 }
 
 .movimiento-item:active {
-  background-color: #f7f7f7;
+  background-color: var(--bg-primary);
 }
 
 .movimiento-item:last-child {
@@ -347,11 +387,11 @@ body {
 }
 
 .movimiento-monto.ingreso {
-  color: #00a854;
+  color: var(--accent-success);
 }
 
 .movimiento-monto.salida {
-  color: #cc0000;
+  color: var(--accent-danger);
 }
 
 .movimiento-info {
@@ -360,19 +400,20 @@ body {
   gap: 4px;
   text-align: left;
   flex: 1;
+  min-width: 0;
 }
 
 .movimiento-detalle {
   font-size: 18px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .movimiento-cuenta {
   font-size: 14px;
   font-weight: 500;
-  color: #666;
-  background-color: #f0f0f0;
+  color: var(--text-secondary);
+  background-color: var(--bg-tertiary);
   padding: 4px 10px;
   border-radius: 12px;
   display: inline-block;
@@ -382,16 +423,15 @@ body {
 .mensaje-vacio {
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: var(--text-muted);
   font-size: 16px;
 }
 
-/* TABLA DE PENDIENTES */
 .tabla-pendientes {
-  background-color: white;
+  background-color: var(--bg-secondary);
   border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--shadow);
 }
 
 .pendiente-info {
@@ -403,31 +443,30 @@ body {
 .pendiente-descripcion {
   font-size: 17px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .pendiente-fecha {
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .pendiente-monto {
   font-size: 20px;
   font-weight: 700;
-  color: #cc0000;
+  color: var(--accent-danger);
 }
 
-/* ===== PENDIENTES AGRUPADOS POR CATEGORÍA ===== */
 .categoria {
-  background-color: white;
+  background-color: var(--bg-secondary);
   border-radius: 15px;
   margin-bottom: 15px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--shadow);
   overflow: hidden;
 }
 
 .categoria-header {
-  background-color: #004481;
+  background-color: var(--accent);
   color: white;
   font-size: 20px;
   font-weight: 600;
@@ -458,21 +497,22 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-light);
 }
 
 #selectPendiente {
   width: 100%;
   padding: 16px 12px;
   border-radius: 12px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border);
   font-size: 16px;
-  background-color: #f9f9f9;
+  background-color: var(--input-bg);
+  color: var(--text-primary);
   margin-bottom: 15px;
 }
 
 .btn-cargar-mas {
-  background-color: #004481;
+  background-color: var(--accent);
   color: white;
   border: none;
   border-radius: 12px;
@@ -481,27 +521,25 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s, background-color 0.2s;
-  box-shadow: 0 2px 6px rgba(0, 68, 129, 0.3);
+  box-shadow: 0 2px 6px var(--shadow);
 }
 
 .btn-cargar-mas:hover {
-  background-color: #003366;
+  background-color: var(--accent-dark);
 }
 
 .btn-cargar-mas:active {
   transform: scale(0.96);
 }
 
-/* ✅ NUEVO: Estilos para modal de transferencia */
 #btnGuardarTransferencia {
-  background-color: #9b59b6;
+  background-color: var(--accent-purple);
 }
 
 #btnCancelarTransferencia {
-  background-color: #666;
+  background-color: var(--text-secondary);
 }
 
-/* ✅ NUEVO: Indicador visual de transferencia */
 .transferencia-visual {
   display: flex;
   align-items: center;
@@ -509,31 +547,12 @@ body {
   gap: 10px;
   margin: 15px 0;
   font-size: 18px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .transferencia-visual .flecha {
   font-size: 24px;
-  color: #9b59b6;
-}
-
-.movimiento-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s;
-  gap: 15px;
-}
-
-.movimiento-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: left;
-  flex: 1;
-  min-width: 0;
+  color: var(--accent-purple);
 }
 
 .movimiento-acciones {
@@ -557,12 +576,12 @@ body {
 }
 
 .btn-editar {
-  background-color: #ffa500;
+  background-color: var(--accent-warning);
   color: white;
 }
 
 .btn-eliminar {
-  background-color: #cc0000;
+  background-color: var(--accent-danger);
   color: white;
 }
 
@@ -571,7 +590,6 @@ body {
   transform: scale(0.9);
 }
 
-/* BOTÓN CONFIGURACIÓN */
 .btn-config {
   position: fixed;
   top: 15px;
@@ -580,7 +598,7 @@ body {
   height: 38px;
   border: none;
   border-radius: 50%;
-  background-color: rgba(255,255,255,0.3);
+  background-color: var(--bg-secondary);
   font-size: 20px;
   cursor: pointer;
   box-shadow: none;
@@ -589,7 +607,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: transform 0.3s ease;
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 .btn-config:active {
@@ -597,11 +615,6 @@ body {
   transform: rotate(90deg);
 }
 
-.btn-config:active {
-  transform: rotate(90deg);
-}
-
-/* OPCIONES DE CONFIGURACIÓN */
 .config-opciones {
   display: flex;
   flex-direction: column;
@@ -614,16 +627,19 @@ body {
   padding: 18px;
   border: none;
   border-radius: 12px;
-  background-color: #f0f4f8;
-  color: #004481;
+  background-color: var(--bg-tertiary);
+  color: var(--accent);
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
   transition: background-color 0.2s;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .btn-config-opcion:active {
-  background-color: #004481;
+  background-color: var(--accent);
   color: white;
 }

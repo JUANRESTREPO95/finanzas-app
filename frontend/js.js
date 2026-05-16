@@ -22,6 +22,7 @@ function escapeHtml(text) {
 
 // ===== CARGA INICIAL =====
 window.onload = function() {
+  aplicarModoOscuroGuardado();
   cargarCuentas(() => {
     cargarTotales();
     cargarMovimientos(true);
@@ -29,6 +30,25 @@ window.onload = function() {
   });
   inicializarMenuFlotante();
 };
+
+function aplicarModoOscuroGuardado() {
+  const modo = localStorage.getItem('modoOscuro');
+  if (modo === 'true') {
+    document.body.classList.add('dark');
+    actualizarBotonModoOscuro(true);
+  }
+}
+
+function toggleModoOscuro() {
+  const esOscuro = document.body.classList.toggle('dark');
+  localStorage.setItem('modoOscuro', esOscuro);
+  actualizarBotonModoOscuro(esOscuro);
+}
+
+function actualizarBotonModoOscuro(esOscuro) {
+  const btn = document.getElementById('btnModoOscuro');
+  if (btn) btn.textContent = esOscuro ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+}
 
 // ===== CUENTAS =====
 function cargarCuentas(callback) {
@@ -568,6 +588,10 @@ document.getElementById('modalConfig').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modalConfig')) {
     document.getElementById('modalConfig').style.display = 'none';
   }
+});
+
+document.getElementById('btnModoOscuro').addEventListener('click', () => {
+  toggleModoOscuro();
 });
 
 function abrirSeccion(seccion) {
