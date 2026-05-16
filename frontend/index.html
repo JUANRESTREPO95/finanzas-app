@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
+  <link rel="icon" type="image/png" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FINANZAS">
+  <title>FINANZAS</title>
+  <link rel="stylesheet" href="css.css">
+</head>
+
+<body>
+  <div class="header" id="headerCuentas"></div>
+  <button class="btn-config" id="btnConfig">⚙️</button>
+
+  <div class="tablas-wrapper">
+    <div class="tabla-container">
+      <h3 class="tabla-titulo">Últimos Movimientos</h3>
+      <div id="tablaMovimientos" class="tabla-movimientos"></div>
+    </div>
+    <div class="tabla-container">
+      <h3 class="tabla-titulo titulo-pendientes">Pendientes de Pago</h3>
+      <div id="tablaPendientes" class="tabla-pendientes"></div>
+    </div>
+  </div>
+
+  <div class="floating-menu">
+    <button class="btn-menu-principal" id="btnMenuPrincipal">☰</button>
+    <div class="menu-opciones" id="menuOpciones">
+      <button class="btn-float plus" title="Nuevo Ingreso">+</button>
+      <button class="btn-float minus" title="Nueva Salida">−</button>
+      <button class="btn-float transfer" title="Transferencia">⇄</button>
+      <button class="btn-float edit" title="Editar Pendientes">✎</button>
+      <button class="btn-float refresh" title="Refrescar">↻</button>
+    </div>
+  </div>
+
+  <!-- MODAL INGRESO -->
+  <div id="modalIngreso" class="modal">
+    <div class="modal-content">
+      <h2>Nuevo Ingreso</h2>
+      <label>Fecha:</label>
+      <input type="date" id="ingresoFecha">
+      <label>Descripción:</label>
+      <input type="text" id="ingresoDescripcion" placeholder="Ej: Venta producto">
+      <label>Monto:</label>
+      <input type="number" id="ingresoMonto" placeholder="0" inputmode="decimal">
+      <label>Cuenta:</label>
+      <select id="ingresoCuenta"></select>
+      <div class="modal-buttons">
+        <button id="btnGuardarIngreso">Guardar</button>
+        <button id="btnCancelarIngreso">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SALIDA -->
+  <div id="modalSalida" class="modal">
+    <div class="modal-content">
+      <h2>Nueva Salida</h2>
+      <label>Fecha:</label>
+      <input type="date" id="salidaFecha">
+      <label>Descripción:</label>
+      <input type="text" id="salidaDescripcion" placeholder="Ej: Compra mercancía">
+      <label>Monto:</label>
+      <input type="number" id="salidaMonto" placeholder="0" inputmode="decimal">
+      <label>Cuenta:</label>
+      <select id="salidaCuenta"></select>
+      <div class="modal-buttons">
+        <button id="btnGuardarSalida">Guardar</button>
+        <button id="btnCancelarSalida">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TRANSFERENCIA -->
+  <div id="modalTransferencia" class="modal">
+    <div class="modal-content">
+      <h2>Nueva Transferencia</h2>
+      <label>Descripción (opcional):</label>
+      <input type="text" id="transferenciaDescripcion" placeholder="Ej: Transferencia para gastos">
+      <label>Cuenta Origen:</label>
+      <select id="transferenciaCuentaOrigen"></select>
+      <div class="transferencia-visual"><span class="flecha">↓</span></div>
+      <label>Cuenta Destino:</label>
+      <select id="transferenciaCuentaDestino"></select>
+      <label>Monto:</label>
+      <input type="number" id="transferenciaMonto" placeholder="0" inputmode="decimal">
+      <div class="modal-buttons">
+        <button id="btnGuardarTransferencia">Transferir</button>
+        <button id="btnCancelarTransferencia">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR PENDIENTES -->
+  <div id="modalPendientes" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Editar Pendientes</h2>
+        <button id="btnReiniciarPendientes"
+          style="background:#cc0000;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;">
+          Reiniciar
+        </button>
+      </div>
+      <div id="listaPendientesContainer" style="margin-top:10px;"></div>
+      <div class="modal-buttons">
+        <button id="btnGuardarAbonos" style="background-color:#004481;">Guardar Abonos</button>
+        <button id="btnCancelarPendiente" style="background-color:#666;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL CONFIGURACION -->
+  <div id="modalConfig" class="modal">
+    <div class="modal-content">
+      <h2>Configuración</h2>
+      
+      <div class="config-opciones">
+        <button class="btn-config-opcion" onclick="abrirSeccion('cuentas')">
+          💳 Cuentas
+        </button>
+        <button class="btn-config-opcion" onclick="abrirSeccion('pendientes')">
+          📋 Pendientes por Pago
+        </button>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btnCerrarConfig" style="background-color:#666;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL CUENTAS -->
+  <div id="modalCuentas" class="modal">
+    <div class="modal-content">
+      <h2>Cuentas</h2>
+
+      <div id="listaCuentas" style="margin-bottom:20px;"></div>
+
+      <label>Nueva cuenta:</label>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <input type="text" id="nuevaCuenta" placeholder="Ej: NEQUI" 
+          style="flex:1;padding:14px;border-radius:12px;border:2px solid #ddd;font-size:16px;">
+        <button id="btnAgregarCuenta"
+          style="background:#004481;color:white;border:none;border-radius:12px;padding:14px 20px;font-size:16px;cursor:pointer;">
+          + Agregar
+        </button>
+      </div>
+
+      <div class="modal-buttons" style="margin-top:20px;">
+        <button id="btnCerrarCuentas" style="background-color:#666;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GESTIONAR PENDIENTES -->
+  <div id="modalGestionPendientes" class="modal">
+    <div class="modal-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Pendientes</h2>
+        <button onclick="mostrarFormNuevoPendiente()"
+          style="background:#004481;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;">
+          + Nuevo
+        </button>
+      </div>
+
+      <!-- FORMULARIO NUEVO/EDITAR PENDIENTE -->
+      <div id="formPendiente" style="display:none;background:#f0f4f8;border-radius:12px;padding:15px;margin-top:15px;">
+        <h3 id="tituloPendienteForm" style="margin:0 0 15px 0;color:#004481;">Nuevo Pendiente</h3>
+        <input type="hidden" id="pendienteEditId">
+        
+        <label>Descripción:</label>
+        <input type="text" id="pendienteDesc" placeholder="Ej: NETFLIX"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Monto Mensual:</label>
+        <input type="number" id="pendienteMonto" placeholder="0"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Fecha de vencimiento:</label>
+        <input type="text" id="pendienteFecha" placeholder="Ej: 15 o 15-30"
+          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+        
+        <label>Categoría:</label>
+        <div style="display:flex;gap:8px;">
+          <select id="pendienteCategoria"
+            style="flex:1;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;"></select>
+          <button onclick="mostrarInputNuevaCategoria()"
+            style="background:#004481;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;cursor:pointer;">
+            + Nueva
+          </button>
+        </div>
+
+        <div id="inputNuevaCategoria" style="display:none;margin-top:10px;">
+          <input type="text" id="nuevaCategoriaP" placeholder="Nueva categoría"
+            style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;">
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:15px;">
+          <button onclick="guardarPendiente()"
+            style="flex:1;background:#004481;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
+            Guardar
+          </button>
+          <button onclick="cancelarFormPendiente()"
+            style="flex:1;background:#666;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      <!-- LISTA DE PENDIENTES AGRUPADOS -->
+      <div id="listaGestionPendientes" style="margin-top:15px;"></div>
+
+      <div class="modal-buttons" style="margin-top:10px;">
+        <button id="btnCerrarGestionPendientes" style="background-color:#666;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  <script src="js.js"></script>
+</body>
+</html>
