@@ -1,228 +1,773 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
-  <link rel="icon" type="image/png" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="FINANZAS">
   <title>FINANZAS</title>
-  <link rel="stylesheet" href="css.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-  <div class="header" id="headerCuentas"></div>
-  <button class="btn-config" id="btnConfig">⚙️</button>
-
-  <div class="tablas-wrapper">
-    <div class="tabla-container">
-      <h3 class="tabla-titulo">Últimos Movimientos</h3>
-      <div id="tablaMovimientos" class="tabla-movimientos"></div>
-    </div>
-    <div class="tabla-container">
-      <h3 class="tabla-titulo titulo-pendientes">Pendientes de Pago</h3>
-      <div id="tablaPendientes" class="tabla-pendientes"></div>
-    </div>
+  <!-- FONDO NEOMORFISMO -->
+  <div class="ambient-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
   </div>
 
-  <div class="floating-menu">
-    <button class="btn-menu-principal" id="btnMenuPrincipal">☰</button>
-    <div class="menu-opciones" id="menuOpciones">
-      <button class="btn-float plus" title="Nuevo Ingreso">+</button>
-      <button class="btn-float minus" title="Nueva Salida">−</button>
-      <button class="btn-float transfer" title="Transferencia">⇄</button>
-      <button class="btn-float edit" title="Editar Pendientes">✎</button>
-      <button class="btn-float refresh" title="Refrescar">↻</button>
-    </div>
-  </div>
+  <!-- APP CONTAINER -->
+  <div class="app">
 
-  <!-- MODAL INGRESO -->
-  <div id="modalIngreso" class="modal">
-    <div class="modal-content">
-      <h2>Nuevo Ingreso</h2>
-      <label>Fecha:</label>
-      <input type="date" id="ingresoFecha">
-      <label>Descripción:</label>
-      <input type="text" id="ingresoDescripcion" placeholder="Ej: Venta producto">
-      <label>Monto:</label>
-      <input type="number" id="ingresoMonto" placeholder="0" inputmode="decimal">
-      <label>Cuenta:</label>
-      <select id="ingresoCuenta"></select>
-      <div class="modal-buttons">
-        <button id="btnGuardarIngreso">Guardar</button>
-        <button id="btnCancelarIngreso">Cancelar</button>
+    <!-- HEADER GLOBAL -->
+    <header class="top-bar">
+      <div class="brand" id="brandSelector" style="cursor:pointer;position:relative;">
+        <div class="brand-logo">F</div>
+        <span id="brandTitulo">Mis Finanzas</span>
+        <span id="brandArrow" style="margin-left:4px;font-size:12px;opacity:0.7;">▾</span>
+        <div id="brandMenu" class="brand-menu" style="display:none;">
+          <button class="brand-menu-item active" data-app="finanzas">
+            <span>💰</span> Mis Finanzas
+          </button>
+          <button class="brand-menu-item" data-app="tarjetas">
+            <span>💳</span> Tarjetas de crédito
+          </button>
+        </div>
       </div>
+      <button class="btn-icon" id="btnCambiarModulo" title="Cambiar módulo">💳</button>
+      <button class="btn-icon" id="btnConfig">⚙️</button>
+    </header>
+
+    <!-- APP: MIS FINANZAS -->
+    <div id="app-finanzas" class="app-module active">
+    <main class="screens" id="screens">
+
+      <!-- 1. DASHBOARD -->
+      <section class="screen active" id="screen-dashboard">
+        <div class="hero-balance">
+          <span class="balance-label">Patrimonio total</span>
+          <span class="balance-amount" id="patrimonioTotal">$0</span>
+          <div id="gruposResumen" class="grupos-resumen"></div>
+          <div class="balance-pills">
+            <div class="pill ingreso">
+              <span class="pill-dot"></span>
+              <span class="pill-label">Ingresos</span>
+              <span class="pill-value" id="resumenIngresos">$0</span>
+            </div>
+            <div class="pill salida">
+              <span class="pill-dot"></span>
+              <span class="pill-label">Gastos</span>
+              <span class="pill-value" id="resumenSalidas">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h3>Mis cuentas</h3>
+          <button class="btn-text" id="btnVerTodasCuentas">Ver todo</button>
+        </div>
+
+        <div class="cuentas-carousel" id="cuentasCarousel"></div>
+
+        <div class="section-header">
+          <h3>Últimos movimientos</h3>
+          <button class="btn-text" id="btnVerTodosMovimientos">Ver todo</button>
+        </div>
+
+        <div class="movimientos-lista" id="dashboardMovimientos"></div>
+      </section>
+
+      <!-- 2. MOVIMIENTOS -->
+      <section class="screen" id="screen-movimientos">
+        <div class="screen-header">
+          <h2>Movimientos</h2>
+        </div>
+        <div class="selector-mes">
+          <button class="mes-arrow" id="mesPrev">‹</button>
+          <span class="mes-label" id="mesLabel">Julio 2026</span>
+          <button class="mes-arrow" id="mesNext">›</button>
+        </div>
+        <div class="filtros-movimientos">
+          <button class="chip active" data-filtro="todos">Todos</button>
+          <button class="chip" data-filtro="INGRESO">Ingresos</button>
+          <button class="chip" data-filtro="SALIDA">Gastos</button>
+        </div>
+        <div class="movimientos-lista" id="todosMovimientos"></div>
+      </section>
+
+      <!-- 3. CUENTAS -->
+      <section class="screen" id="screen-cuentas">
+        <div class="screen-header">
+          <h2>Cuentas</h2>
+        </div>
+        <div class="cuentas-grid" id="cuentasGrid"></div>
+      </section>
+
+      <!-- 4. PENDIENTES -->
+      <section class="screen" id="screen-pendientes">
+        <div class="screen-header">
+          <div class="header-total">
+            <span>Pendientes</span>
+            <span class="header-amount" id="totalPendientes">$0</span>
+          </div>
+          <div class="screen-header-actions">
+            <button class="btn-icon small" id="btnAddPendiente">+</button>
+            <button class="btn-icon small reiniciar-icon" id="btnReiniciarPendientes" title="Reiniciar abonos">↻</button>
+          </div>
+        </div>
+        <div class="pendientes-lista" id="todosPendientes"></div>
+      </section>
+
+    </main>
+
+    <!-- BOTÓN FLOTANTE PRINCIPAL -->
+    <button class="fab-main" id="fabMain">+</button>
+
+    <!-- MENÚ RÁPIDO FAB -->
+    <div class="fab-menu" id="fabMenu">
+      <button class="fab-item ingreso" data-action="ingreso">
+        <span class="fab-icon">↓</span>
+        <span class="fab-caption">Ingreso</span>
+      </button>
+      <button class="fab-item salida" data-action="salida">
+        <span class="fab-icon">↑</span>
+        <span class="fab-caption">Gasto</span>
+      </button>
+      <button class="fab-item transferencia" data-action="transferencia">
+        <span class="fab-icon">⇄</span>
+        <span class="fab-caption">Mover</span>
+      </button>
+    </div>
+
+    <!-- NAVEGACIÓN INFERIOR FINANZAS -->
+    <nav class="bottom-nav" id="nav-finanzas">
+      <button class="nav-item active" data-screen="screen-dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Inicio</span>
+      </button>
+      <button class="nav-item" data-screen="screen-movimientos">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Movimientos</span>
+      </button>
+      <button class="nav-item" data-screen="screen-cuentas">
+        <span class="nav-icon">💳</span>
+        <span class="nav-label">Cuentas</span>
+      </button>
+      <button class="nav-item" data-screen="screen-pendientes">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Pendientes</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- APP: TARJETAS DE CRÉDITO -->
+  <div id="app-tarjetas" class="app-module">
+
+    <!-- PANTALLAS TARJETAS -->
+    <main class="screens" id="screens-tarjetas">
+
+      <!-- T1. DASHBOARD TARJETAS -->
+      <section class="screen active" id="screen-tarjetas-dashboard">
+        <div class="hero-balance" style="background: linear-gradient(135deg, #ef4444, #f97316);">
+          <span class="balance-label">Deuda total</span>
+          <span class="balance-amount" id="tarjetasDeudaTotal">$0</span>
+          <div class="balance-pills">
+            <div class="pill ingreso">
+              <span class="pill-dot" style="background:#34d399;"></span>
+              <span class="pill-label">Cupo total</span>
+              <span class="pill-value" id="tarjetasCupoTotal">$0</span>
+            </div>
+            <div class="pill salida">
+              <span class="pill-dot" style="background:#f87171;"></span>
+              <span class="pill-label">Disponible</span>
+              <span class="pill-value" id="tarjetasDisponibleTotal">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h3>Mis tarjetas</h3>
+          <button class="btn-text" id="btnNuevaTarjeta">+ Agregar</button>
+        </div>
+        <div class="tarjetas-lista" id="tarjetasLista">
+          <div class="mensaje-vacio">No tienes tarjetas registradas</div>
+        </div>
+
+        <div class="section-header">
+          <h3>Resumen</h3>
+        </div>
+        <div class="tarjetas-resumen-grid" id="tarjetasResumenGrid">
+          <div class="tarjeta-resumen-card">
+            <span class="tarjeta-resumen-label">Pago mínimo total</span>
+            <span class="tarjeta-resumen-value" id="tarjetasPagoMinimoTotal">$0</span>
+          </div>
+          <div class="tarjeta-resumen-card">
+            <span class="tarjeta-resumen-label">Total compras activas</span>
+            <span class="tarjeta-resumen-value" id="tarjetasComprasActivasTotal">$0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- T2. DETALLE TARJETA -->
+      <section class="screen" id="screen-tarjeta-detalle">
+        <div class="screen-header">
+          <button class="btn-icon small" id="btnVolverTarjeta">‹</button>
+          <h2 id="tarjetaDetalleNombre">Tarjeta</h2>
+        </div>
+
+        <div class="tarjeta-big-card" id="tarjetaBigCard">
+          <div class="tarjeta-big-header">
+            <span class="tarjeta-big-franquicia" id="tarjetaDetalleFranquicia"></span>
+            <span class="tarjeta-big-chip">💳</span>
+          </div>
+          <div class="tarjeta-big-row">
+            <div class="tarjeta-big-item">
+              <span class="tarjeta-big-label">Cupo total</span>
+              <span class="tarjeta-big-value" id="tarjetaDetalleCupo">$0</span>
+            </div>
+            <div class="tarjeta-big-item">
+              <span class="tarjeta-big-label">Deuda</span>
+              <span class="tarjeta-big-value" id="tarjetaDetalleDeuda">$0</span>
+            </div>
+          </div>
+          <div class="tarjeta-big-row">
+            <div class="tarjeta-big-item">
+              <span class="tarjeta-big-label">Disponible</span>
+              <span class="tarjeta-big-value" id="tarjetaDetalleDisponible">$0</span>
+            </div>
+            <div class="tarjeta-big-item">
+              <span class="tarjeta-big-label">Cuota de manejo</span>
+              <span class="tarjeta-big-value" id="tarjetaDetalleCuotaManejo">$0</span>
+            </div>
+          </div>
+          <div class="tarjeta-big-row">
+            <div class="tarjeta-big-item">
+              <span class="tarjeta-big-label">Pago mínimo</span>
+              <span class="tarjeta-big-value" id="tarjetaDetallePagoMinimo">$0</span>
+            </div>
+          </div>
+          <div class="tarjeta-progress">
+            <div class="tarjeta-progress-bar" id="tarjetaDetalleProgress"></div>
+          </div>
+          <div class="tarjeta-dates" id="tarjetaDetalleFechas"></div>
+        </div>
+
+        <div class="section-header">
+          <h3>Compras</h3>
+          <button class="btn-text" id="btnNuevaCompra">+ Agregar</button>
+        </div>
+        <div class="compras-lista" id="tarjetaCompras"></div>
+
+        <div class="section-header">
+          <h3>Pagos</h3>
+          <button class="btn-text" id="btnNuevoPago">+ Agregar</button>
+        </div>
+        <div class="pagos-lista" id="tarjetaPagos"></div>
+      </section>
+
+      <!-- T3. COMPRAS ACTIVAS -->
+      <section class="screen" id="screen-tarjetas-compras">
+        <div class="screen-header">
+          <h2>Compras activas</h2>
+        </div>
+        <div class="compras-lista" id="todasComprasActivas"></div>
+      </section>
+
+      <!-- T4. SIMULADOR -->
+      <section class="screen" id="screen-tarjetas-simulador">
+        <div class="screen-header">
+          <h2>Simulador</h2>
+        </div>
+
+        <div class="form-group">
+          <label>Tarjeta</label>
+          <select id="simTarjeta"></select>
+        </div>
+
+        <div class="form-group">
+          <label>Monto de la compra</label>
+          <div class="monto-input">
+            <span class="monto-symbol">$</span>
+            <input type="number" id="simMonto" placeholder="0" inputmode="decimal">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Cuotas</label>
+          <input type="number" id="simCuotas" placeholder="Ej: 24" min="1" max="72" inputmode="numeric" value="1">
+        </div>
+
+        <button class="btn-giant" id="btnSimular">Simular</button>
+
+        <div id="simResultado" class="sim-resultado" style="display:none;">
+          <div class="sim-row">
+            <span>Cuota mensual</span>
+            <span class="sim-value" id="simCuotaMensual">$0</span>
+          </div>
+          <div class="sim-row">
+            <span>Total pagado</span>
+            <span class="sim-value" id="simTotalPagado">$0</span>
+          </div>
+          <div class="sim-row">
+            <span>Total intereses</span>
+            <span class="sim-value" id="simTotalIntereses">$0</span>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label>Nombre para guardar</label>
+            <input type="text" id="simNombre" placeholder="Ej: Compra TV">
+          </div>
+          <button class="btn-giant secondary" id="btnGuardarSimulacion">Guardar simulación</button>
+        </div>
+
+        <div class="section-header">
+          <h3>Simulaciones guardadas</h3>
+        </div>
+        <div class="simulaciones-lista" id="simulacionesLista"></div>
+      </section>
+
+    </main>
+
+    <!-- NAVEGACIÓN INFERIOR TARJETAS -->
+    <nav class="bottom-nav" id="nav-tarjetas">
+      <button class="nav-item active" data-screen="screen-tarjetas-dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Inicio</span>
+      </button>
+      <button class="nav-item" data-screen="screen-tarjetas-compras">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Compras</span>
+      </button>
+      <button class="nav-item" data-screen="screen-tarjetas-simulador">
+        <span class="nav-icon">🔮</span>
+        <span class="nav-label">Simular</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODAL TRANSACCIÓN -->
+  <div id="modalTransaccion" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2 id="modalTransaccionTitulo">Nuevo</h2>
+        <button class="modal-close" id="btnCerrarTransaccion">×</button>
+      </div>
+
+      <div class="tipo-switch" id="tipoSwitch">
+        <button class="tipo-btn active" data-tipo="INGRESO">Ingreso</button>
+        <button class="tipo-btn" data-tipo="SALIDA">Gasto</button>
+        <button class="tipo-btn" data-tipo="TRANSFERENCIA">Mover</button>
+      </div>
+
+      <input type="hidden" id="transaccionEditId">
+      <input type="hidden" id="transaccionEditTipo">
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Fecha</label>
+          <input type="date" id="transaccionFecha">
+        </div>
+        <div class="form-group half">
+          <label>Hora</label>
+          <input type="time" id="transaccionHora">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Monto</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="transaccionMonto" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Descripción</label>
+        <input type="text" id="transaccionDescripcion" placeholder="Ej: Compra supermercado">
+      </div>
+
+      <div class="form-row" id="rowOrigenDestino">
+        <div class="form-group half">
+          <label>Origen</label>
+          <select id="transaccionCuentaOrigen"></select>
+        </div>
+        <div class="form-group half">
+          <label>Destino</label>
+          <select id="transaccionCuentaDestino"></select>
+        </div>
+      </div>
+
+      <div class="form-group" id="rowCuenta">
+        <label>Cuenta</label>
+        <select id="transaccionCuenta"></select>
+      </div>
+
+      <button class="btn-giant" id="btnGuardarTransaccion">Guardar</button>
+      <button class="btn-giant btn-delete-transaccion" id="btnEliminarTransaccion" style="display:none;">Eliminar</button>
     </div>
   </div>
 
-  <!-- MODAL SALIDA -->
-  <div id="modalSalida" class="modal">
-    <div class="modal-content">
-      <h2>Nueva Salida</h2>
-      <label>Fecha:</label>
-      <input type="date" id="salidaFecha">
-      <label>Descripción:</label>
-      <input type="text" id="salidaDescripcion" placeholder="Ej: Compra mercancía">
-      <label>Monto:</label>
-      <input type="number" id="salidaMonto" placeholder="0" inputmode="decimal">
-      <label>Cuenta:</label>
-      <select id="salidaCuenta"></select>
-      <div class="modal-buttons">
-        <button id="btnGuardarSalida">Guardar</button>
-        <button id="btnCancelarSalida">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL TRANSFERENCIA -->
-  <div id="modalTransferencia" class="modal">
-    <div class="modal-content">
-      <h2>Nueva Transferencia</h2>
-      <label>Descripción (opcional):</label>
-      <input type="text" id="transferenciaDescripcion" placeholder="Ej: Transferencia para gastos">
-      <label>Cuenta Origen:</label>
-      <select id="transferenciaCuentaOrigen"></select>
-      <div class="transferencia-visual"><span class="flecha">↓</span></div>
-      <label>Cuenta Destino:</label>
-      <select id="transferenciaCuentaDestino"></select>
-      <label>Monto:</label>
-      <input type="number" id="transferenciaMonto" placeholder="0" inputmode="decimal">
-      <div class="modal-buttons">
-        <button id="btnGuardarTransferencia">Transferir</button>
-        <button id="btnCancelarTransferencia">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL EDITAR PENDIENTES -->
-  <div id="modalPendientes" class="modal">
-    <div class="modal-content">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h2 style="margin:0;">Editar Pendientes</h2>
-        <button id="btnReiniciarPendientes"
-          style="background:#cc0000;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;">
-          Reiniciar
-        </button>
-      </div>
-      <div id="listaPendientesContainer" style="margin-top:10px;"></div>
-      <div class="modal-buttons">
-        <button id="btnGuardarAbonos" style="background-color:#004481;">Guardar Abonos</button>
-        <button id="btnCancelarPendiente" style="background-color:#666;">Cancelar</button>
-      </div>
-    </div>
-  </div>
-  <!-- MODAL CONFIGURACION -->
+  <!-- MODAL CONFIGURACIÓN -->
   <div id="modalConfig" class="modal">
-    <div class="modal-content">
-      <h2>Configuración</h2>
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2>Configuración</h2>
+        <button class="modal-close" id="btnCerrarConfig">×</button>
+      </div>
+
+      <div class="config-list" id="configFinanzas">
+        <button class="config-row" id="btnModoOscuro">
+          <span class="config-icon">🌙</span>
+          <span class="config-text">Modo oscuro</span>
+          <span class="config-toggle"><span class="toggle-knob"></span></span>
+        </button>
+
+        <button class="config-row" data-seccion="cuentas">
+          <span class="config-icon">💳</span>
+          <span class="config-text">Gestionar cuentas</span>
+          <span class="config-chevron">›</span>
+        </button>
+
+        <button class="config-row" data-seccion="pendientes">
+          <span class="config-icon">📋</span>
+          <span class="config-text">Gestionar pendientes</span>
+          <span class="config-chevron">›</span>
+        </button>
+      </div>
       
-      <div class="config-opciones">
-        <button class="btn-config-opcion" onclick="abrirSeccion('cuentas')">
-          💳 Cuentas
+      <div class="config-list" id="configTarjetas" style="display:none;">
+        <button class="config-row" id="btnModoOscuroTarjetas">
+          <span class="config-icon">🌙</span>
+          <span class="config-text">Modo oscuro</span>
+          <span class="config-toggle"><span class="toggle-knob"></span></span>
         </button>
-        <button class="btn-config-opcion" onclick="abrirSeccion('pendientes')">
-          📋 Pendientes por Pago
-        </button>
-        <button class="btn-config-opcion" id="btnModoOscuro">
-          🌙 Modo Oscuro
-        </button>
-      </div>
 
-      <div class="modal-buttons">
-        <button id="btnCerrarConfig" style="background-color:#666;">Cerrar</button>
+        <button class="config-row" data-seccion="configuracion-tarjetas">
+          <span class="config-icon">💳</span>
+          <span class="config-text">Gestionar tarjetas</span>
+          <span class="config-chevron">›</span>
+        </button>
       </div>
     </div>
   </div>
-  <!-- MODAL CUENTAS -->
+
+  <!-- MODAL GESTIÓN CUENTAS -->
   <div id="modalCuentas" class="modal">
-    <div class="modal-content">
-      <h2>Cuentas</h2>
-
-      <div style="margin-bottom:10px;color:#666;font-size:14px;">Marca las cuentas que se incluyen en "Total disponible"</div>
-
-      <div id="listaCuentas" style="margin-bottom:20px;"></div>
-
-      <label>Nueva cuenta:</label>
-      <div style="display:flex;gap:10px;margin-top:8px;">
-        <input type="text" id="nuevaCuenta" placeholder="Ej: NEQUI" 
-          style="flex:1;padding:14px;border-radius:12px;border:2px solid #ddd;font-size:16px;">
-        <button id="btnAgregarCuenta"
-          style="background:#004481;color:white;border:none;border-radius:12px;padding:14px 20px;font-size:16px;cursor:pointer;">
-          + Agregar
-        </button>
+    <div class="modal-overlay"></div>
+    <div class="modal-card modal-card-tall">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2>Mis cuentas</h2>
+        <button class="modal-close" id="btnCerrarCuentas">×</button>
       </div>
 
-      <div class="modal-buttons" style="margin-top:20px;">
-        <button id="btnCerrarCuentas" style="background-color:#666;">Cerrar</button>
+      <p class="modal-hint">Activa "Incluir en total" para sumarla al patrimonio.</p>
+
+      <div id="listaCuentas" class="lista-cuentas"></div>
+
+      <div class="form-group">
+        <label>Agregar cuenta</label>
+        <div class="input-with-button">
+          <input type="text" id="nuevaCuenta" placeholder="Ej: NEQUI">
+          <button class="btn-inline" id="btnAgregarCuenta">+</button>
+        </div>
       </div>
+
+      <div class="separador"></div>
+
+      <h3 style="margin:0 0 10px;font-size:17px;">Grupos de cuentas</h3>
+      <p class="modal-hint">Crea grupos para ver su suma debajo del patrimonio total.</p>
+
+      <button class="btn-giant secondary" id="btnNuevoGrupo">+ Nuevo grupo</button>
+
+      <div id="formGrupo" class="form-pendiente">
+        <input type="hidden" id="grupoEditId">
+
+        <div class="form-group">
+          <label>Nombre del grupo</label>
+          <input type="text" id="grupoNombre" placeholder="Ej: AHORROS EXTERNOS">
+        </div>
+
+        <div class="form-group">
+          <label>Cuentas del grupo</label>
+          <div id="grupoCuentasCheckboxes" class="checkbox-grid"></div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-text" id="btnCancelarFormGrupo">Cancelar</button>
+          <button class="btn-giant" id="btnGuardarGrupo">Guardar</button>
+        </div>
+      </div>
+
+      <div id="listaGrupos" class="lista-grupos"></div>
     </div>
   </div>
 
-  <!-- MODAL GESTIONAR PENDIENTES -->
-  <div id="modalGestionPendientes" class="modal">
-    <div class="modal-content">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h2 style="margin:0;">Pendientes</h2>
-        <button onclick="mostrarFormNuevoPendiente()"
-          style="background:#004481;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;">
-          + Nuevo
-        </button>
+  <!-- MODAL GESTIÓN PENDIENTES -->
+  <div id="modalPendientes" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card modal-card-tall">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2>Pendientes</h2>
+        <button class="modal-close" id="btnCerrarPendientes">×</button>
       </div>
 
-      <!-- FORMULARIO NUEVO/EDITAR PENDIENTE -->
-      <div id="formPendiente" style="display:none;background:#f0f4f8;border-radius:12px;padding:15px;margin-top:15px;">
-        <h3 id="tituloPendienteForm" style="margin:0 0 15px 0;color:#004481;">Nuevo Pendiente</h3>
+      <button class="btn-giant secondary" id="btnNuevoPendiente">+ Nuevo pendiente</button>
+
+      <div id="formPendiente" class="form-pendiente">
         <input type="hidden" id="pendienteEditId">
-        
-        <label>Descripción:</label>
-        <input type="text" id="pendienteDesc" placeholder="Ej: NETFLIX"
-          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
-        
-        <label>Monto Mensual:</label>
-        <input type="number" id="pendienteMonto" placeholder="0"
-          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
-        
-        <label>Fecha de vencimiento:</label>
-        <input type="text" id="pendienteFecha" placeholder="Ej: 15 o 15-30"
-          style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
-        
-        <label>Categoría:</label>
-        <div style="display:flex;gap:8px;">
-          <select id="pendienteCategoria"
-            style="flex:1;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;"></select>
-          <button onclick="mostrarInputNuevaCategoria()"
-            style="background:#004481;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;cursor:pointer;">
-            + Nueva
-          </button>
+
+        <div class="form-group">
+          <label>Descripción</label>
+          <input type="text" id="pendienteDesc" placeholder="Ej: NETFLIX">
         </div>
 
-        <div id="inputNuevaCategoria" style="display:none;margin-top:10px;">
-          <input type="text" id="nuevaCategoriaP" placeholder="Nueva categoría"
-            style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;font-size:16px;box-sizing:border-box;">
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Monto mensual</label>
+            <input type="number" id="pendienteMonto" placeholder="0">
+          </div>
+          <div class="form-group half">
+            <label>Vence</label>
+            <input type="text" id="pendienteFecha" placeholder="Ej: 15">
+          </div>
         </div>
 
-        <div style="display:flex;gap:10px;margin-top:15px;">
-          <button onclick="guardarPendiente()"
-            style="flex:1;background:#004481;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
-            Guardar
-          </button>
-          <button onclick="cancelarFormPendiente()"
-            style="flex:1;background:#666;color:white;border:none;border-radius:10px;padding:14px;font-size:16px;cursor:pointer;">
-            Cancelar
-          </button>
+        <div class="form-group">
+          <label>Categoría</label>
+          <div class="input-with-button">
+            <select id="pendienteCategoria"></select>
+            <button class="btn-inline" id="btnNuevaCategoriaP">+</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="inputNuevaCategoriaP" style="display:none;">
+          <input type="text" id="nuevaCategoriaP" placeholder="Nueva categoría">
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-text" id="btnCancelarFormPendiente">Cancelar</button>
+          <button class="btn-giant" id="btnGuardarPendiente">Guardar</button>
         </div>
       </div>
 
-      <!-- LISTA DE PENDIENTES AGRUPADOS -->
-      <div id="listaGestionPendientes" style="margin-top:15px;"></div>
-
-      <div class="modal-buttons" style="margin-top:10px;">
-        <button id="btnCerrarGestionPendientes" style="background-color:#666;">Cerrar</button>
-      </div>
+      <div id="listaGestionPendientes" class="lista-gestion-pendientes"></div>
     </div>
   </div>
-  <script src="js.js"></script>
+
+  <!-- MODAL ABONO RÁPIDO -->
+  <div id="modalAbono" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2 id="abonoTitulo">Abonar</h2>
+        <button class="modal-close" id="btnCerrarAbono">×</button>
+      </div>
+
+      <p class="modal-hint" id="abonoHint">Restante: $0</p>
+
+      <input type="hidden" id="abonoId">
+
+      <div class="form-group">
+        <label>Monto a abonar</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="abonoMonto" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <button class="btn-giant" id="btnGuardarAbono">Abonar</button>
+    </div>
+  </div>
+
+  <!-- MODAL TARJETA (AGREGAR/EDITAR) -->
+  <div id="modalTarjeta" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2 id="modalTarjetaTitulo">Nueva tarjeta</h2>
+        <button class="modal-close" id="btnCerrarTarjeta">×</button>
+      </div>
+
+      <input type="hidden" id="tarjetaEditId">
+
+      <div class="form-group">
+        <label>Nombre / banco</label>
+        <input type="text" id="tarjetaNombre" placeholder="Ej: Bancolombia Mastercard">
+      </div>
+
+      <div class="form-group">
+        <label>Franquicia</label>
+        <input type="text" id="tarjetaFranquicia" placeholder="Ej: VISA, MASTERCARD, AMEX">
+      </div>
+
+      <div class="form-group">
+        <label>Cupo total</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="tarjetaCupo" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Deuda actual</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="tarjetaDeuda" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Tasa mensual (%)</label>
+          <input type="text" id="tarjetaTasaMensual" placeholder="Ej: 2.1285" inputmode="decimal">
+        </div>
+        <div class="form-group half">
+          <label>Tasa anual (%)</label>
+          <input type="text" id="tarjetaTasaAnual" placeholder="Ej: 34.49" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Día de corte</label>
+          <input type="number" id="tarjetaDiaCorte" placeholder="1-31" min="1" max="31">
+        </div>
+        <div class="form-group half">
+          <label>Cuota de manejo ($)</label>
+          <input type="text" id="tarjetaCuotaManejo" placeholder="Ej: 36990" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Día de pago</label>
+          <input type="number" id="tarjetaDiaPago" placeholder="1-31" min="1" max="31">
+        </div>
+        <div class="form-group half">
+          <label>Día de pago</label>
+          <input type="number" id="tarjetaDiaPago" placeholder="1-31" min="1" max="31">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Color</label>
+        <input type="color" id="tarjetaColor" value="#ef4444">
+      </div>
+
+      <button class="btn-giant" id="btnGuardarTarjeta">Guardar</button>
+      <button class="btn-giant btn-delete-transaccion" id="btnEliminarTarjeta" style="display:none;">Eliminar tarjeta</button>
+    </div>
+  </div>
+
+  <!-- MODAL COMPRA -->
+  <div id="modalCompra" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2>Nueva compra</h2>
+        <button class="modal-close" id="btnCerrarCompra">×</button>
+      </div>
+
+      <input type="hidden" id="compraTarjetaId">
+
+      <div class="form-group">
+        <label>Nombre / concepto</label>
+        <input type="text" id="compraNombre" placeholder="Ej: Zapatos">
+      </div>
+
+      <div class="form-group">
+        <label>Descripción (opcional)</label>
+        <input type="text" id="compraDescripcion" placeholder="Ej: Tienda D1">
+      </div>
+
+      <div class="form-group">
+        <label>Monto</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="compraMonto" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Cuotas</label>
+          <input type="number" id="compraCuotas" placeholder="Ej: 24" min="1" max="72" inputmode="numeric" value="1">
+        </div>
+        <div class="form-group half" style="display:flex;align-items:flex-end;gap:8px;padding-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
+            <input type="checkbox" id="compraUnaCuotaSinInteres" style="width:20px;height:20px;">
+            Pago a una cuota sin intereses
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="compraFecha">
+      </div>
+
+      <button class="btn-giant" id="btnGuardarCompra">Guardar</button>
+    </div>
+  </div>
+
+  <!-- MODAL PAGO -->
+  <div id="modalPago" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2 id="modalPagoTitulo">Nuevo pago</h2>
+        <button class="modal-close" id="btnCerrarPago">×</button>
+      </div>
+
+      <input type="hidden" id="pagoTarjetaId">
+
+      <div class="form-group">
+        <label>Monto</label>
+        <div class="monto-input">
+          <span class="monto-symbol">$</span>
+          <input type="number" id="pagoMonto" placeholder="0" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="pagoTipo">
+          <option value="PAGO_MINIMO">Pago mínimo</option>
+          <option value="PAGO_TOTAL">Pago total</option>
+          <option value="ABONO_CAPITAL">Abono a capital</option>
+          <option value="OTRO">Otro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="pagoFecha">
+      </div>
+
+      <div class="form-group">
+        <label>Nota (opcional)</label>
+        <input type="text" id="pagoNota" placeholder="Ej: Pago julio">
+      </div>
+
+      <button class="btn-giant" id="btnGuardarPago">Guardar pago</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
 </body>
 </html>

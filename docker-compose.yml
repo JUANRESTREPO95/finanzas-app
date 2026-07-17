@@ -1,11 +1,11 @@
 services:
-  finanzas:
+  finanzas-app:
     build:
       context: .
       dockerfile: backend/Dockerfile
     container_name: finanzas-app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3002:3000"
     volumes:
       - ./data:/app/data

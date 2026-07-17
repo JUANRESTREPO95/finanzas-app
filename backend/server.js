@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./database');
+const tarjetasRoutes = require('./tarjetas-routes');
 
 const app = express();
 const PORT = 3000;
@@ -9,6 +10,8 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
+
+app.use('/api/tarjetas', tarjetasRoutes);
 
 // ========== CUENTAS ==========
 app.get('/api/cuentas', (req, res) => {
@@ -27,14 +30,12 @@ app.post('/api/cuentas', (req, res) => {
   }
 });
 
-// Eliminar cuenta
 app.delete('/api/cuentas/:nombre', (req, res) => {
   const { nombre } = req.params;
   db.prepare('DELETE FROM cuentas WHERE nombre = ?').run(nombre);
   res.json({ success: true });
 });
 
-// Toggle visibilidad en total
 app.put('/api/cuentas/:nombre/visible', (req, res) => {
   const { nombre } = req.params;
   const { incluir } = req.body;
@@ -42,85 +43,185 @@ app.put('/api/cuentas/:nombre/visible', (req, res) => {
   res.json({ success: true });
 });
 
-
-
 // ========== TOTALES ==========
-app.get('/api/totales', (req, res) => {
+function calcularTotales() {
   const cuentas = db.prepare('SELECT nombre FROM cuentas').all().map(c => c.nombre);
   const totales = {};
   cuentas.forEach(c => totales[c] = 0);
 
-  const ingresos = db.prepare('SELECT monto, cuenta FROM ingresos').all();
-  ingresos.forEach(i => {
-    if (totales.hasOwnProperty(i.cuenta)) totales[i.cuenta] += i.monto;
-  });
+  db.prepare('SELECT monto, cuenta FROM ingresos').all()
+    .forEach(i => { if (totales.hasOwnProperty(i.cuenta)) totales[i.cuenta] += i.monto; });
+  db.prepare('SELECT monto, cuenta FROM salidas').all()
+    .forEach(s => { if (totales.hasOwnProperty(s.cuenta)) totales[s.cuenta] -= s.monto; });
 
-  const salidas = db.prepare('SELECT monto, cuenta FROM salidas').all();
-  salidas.forEach(s => {
-    if (totales.hasOwnProperty(s.cuenta)) totales[s.cuenta] -= s.monto;
-  });
+  return totales;
+}
 
-  res.json(totales);
+app.get('/api/totales', (req, res) => {
+  const totales = calcularTotales();
+  const cuentasVisibles = db.prepare('SELECT nombre, incluir_en_total FROM cuentas').all();
+  const patrimonio = cuentasVisibles
+    .filter(c => c.incluir_en_total === 1)
+    .reduce((acc, c) => acc + (totales[c.nombre] || 0), 0);
+
+  const grupos = db.prepare('SELECT * FROM grupos_cuentas').all().map(g => {
+    const cuentasGrupo = JSON.parse(g.cuentas || '[]');
+    const suma = cuentasGrupo.reduce((acc, c) => acc + (totales[c] || 0), 0);
+    return { id: g.id, nombre: g.nombre, cuentas: cuentasGrupo, total: suma };
+  });
+  res.json({ patrimonio, cuentas: totales, grupos });
 });
 
 app.get('/api/totales/sin-ahorros', (req, res) => {
-  const totalesRes = {};
-  const cuentas = db.prepare('SELECT nombre FROM cuentas').all().map(c => c.nombre);
-  cuentas.forEach(c => totalesRes[c] = 0);
-
-  db.prepare('SELECT monto, cuenta FROM ingresos').all()
-    .forEach(i => { if (totalesRes.hasOwnProperty(i.cuenta)) totalesRes[i.cuenta] += i.monto; });
-  db.prepare('SELECT monto, cuenta FROM salidas').all()
-    .forEach(s => { if (totalesRes.hasOwnProperty(s.cuenta)) totalesRes[s.cuenta] -= s.monto; });
-
+  const totales = calcularTotales();
   const visibles = db.prepare('SELECT nombre FROM cuentas WHERE incluir_en_total = 1').all().map(c => c.nombre);
   let total = 0;
-  for (let cuenta in totalesRes) {
-    if (visibles.includes(cuenta)) total += totalesRes[cuenta];
+  for (let cuenta in totales) {
+    if (visibles.includes(cuenta)) total += totales[cuenta];
   }
   res.json({ total });
 });
 
 // ========== MIGRACIONES ==========
-try {
-  db.exec(`ALTER TABLE ingresos ADD COLUMN created_at INTEGER DEFAULT 0;`);
-  db.exec(`UPDATE ingresos SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
-} catch(e) {}
-try {
-  db.exec(`ALTER TABLE salidas ADD COLUMN created_at INTEGER DEFAULT 0;`);
-  db.exec(`UPDATE salidas SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
-} catch(e) {}
-try {
-  db.exec(`ALTER TABLE cuentas ADD COLUMN incluir_en_total INTEGER DEFAULT 1;`);
-  db.exec(`UPDATE cuentas SET incluir_en_total = 0 WHERE nombre = 'AHORROS' AND incluir_en_total = 1;`);
-} catch(e) {}
+function ejecutarMigraciones() {
+  try {
+    db.exec(`ALTER TABLE ingresos ADD COLUMN created_at INTEGER DEFAULT 0;`);
+    db.exec(`UPDATE ingresos SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
+  } catch(e) {}
+  try {
+    db.exec(`ALTER TABLE salidas ADD COLUMN created_at INTEGER DEFAULT 0;`);
+    db.exec(`UPDATE salidas SET created_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE created_at = 0;`);
+  } catch(e) {}
+  try {
+    db.exec(`ALTER TABLE cuentas ADD COLUMN incluir_en_total INTEGER DEFAULT 1;`);
+    db.exec(`UPDATE cuentas SET incluir_en_total = 0 WHERE nombre = 'AHORROS' AND incluir_en_total = 1;`);
+  } catch(e) {}
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS grupos_cuentas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      cuentas TEXT NOT NULL DEFAULT '[]'
+    );`);
+  } catch(e) {}
+}
+
+ejecutarMigraciones();
+
+// ========== GRUPOS DE CUENTAS ==========
+app.get('/api/grupos', (req, res) => {
+  const grupos = db.prepare('SELECT * FROM grupos_cuentas').all().map(g => ({
+    id: g.id,
+    nombre: g.nombre,
+    cuentas: JSON.parse(g.cuentas || '[]')
+  }));
+  res.json(grupos);
+});
+
+app.post('/api/grupos', (req, res) => {
+  const { nombre, cuentas } = req.body;
+  if (!nombre || !Array.isArray(cuentas)) return res.json({ success: false, message: 'Faltan datos' });
+  try {
+    db.prepare('INSERT INTO grupos_cuentas (nombre, cuentas) VALUES (?, ?)').run(nombre.trim().toUpperCase(), JSON.stringify(cuentas));
+    res.json({ success: true });
+  } catch(e) {
+    res.json({ success: false, message: 'Ya existe un grupo con ese nombre' });
+  }
+});
+
+app.put('/api/grupos/:id', (req, res) => {
+  const { id } = req.params;
+  const { nombre, cuentas } = req.body;
+  if (!nombre || !Array.isArray(cuentas)) return res.json({ success: false, message: 'Faltan datos' });
+  db.prepare('UPDATE grupos_cuentas SET nombre=?, cuentas=? WHERE id=?')
+    .run(nombre.trim().toUpperCase(), JSON.stringify(cuentas), parseInt(id));
+  res.json({ success: true });
+});
+
+app.delete('/api/grupos/:id', (req, res) => {
+  db.prepare('DELETE FROM grupos_cuentas WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ success: true });
+});
 
 // ========== INGRESOS ==========
 app.post('/api/ingresos', (req, res) => {
-  const { fecha, hora, descripcion, monto, cuenta } = req.body;
+  let { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
+  const ahora = new Date();
+  if (!fecha) {
+    fecha = ahora.toISOString().split('T')[0];
+  }
+  if (!hora) {
+    hora = ahora.toTimeString().slice(0,5);
+  }
   const fechaHora = `${fecha} ${hora}`;
   const createdAt = Math.floor(Date.now() / 1000);
   db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt);
+  res.json({ success: true, fecha, hora });
+});
+
+app.delete('/api/ingresos/:id', (req, res) => {
+  db.prepare('DELETE FROM ingresos WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ success: true });
+});
+
+app.put('/api/movimientos/INGRESO/:id', (req, res) => {
+  const { id } = req.params;
+  const { fecha, hora, descripcion, monto, cuenta } = req.body;
+  const fechaHora = `${fecha} ${hora}`;
+  const createdAt = Math.floor(Date.now() / 1000);
+  db.prepare('UPDATE ingresos SET fecha_hora=?, descripcion=?, monto=?, cuenta=?, created_at=? WHERE id=?')
+    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt, parseInt(id));
   res.json({ success: true });
 });
 
 // ========== SALIDAS ==========
 app.post('/api/salidas', (req, res) => {
-  const { fecha, hora, descripcion, monto, cuenta } = req.body;
+  let { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
+  const ahora = new Date();
+  if (!fecha) {
+    fecha = ahora.toISOString().split('T')[0];
+  }
+  if (!hora) {
+    hora = ahora.toTimeString().slice(0,5);
+  }
   const fechaHora = `${fecha} ${hora}`;
   const createdAt = Math.floor(Date.now() / 1000);
   db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt);
+  res.json({ success: true, fecha, hora });
+});
+
+app.delete('/api/salidas/:id', (req, res) => {
+  db.prepare('DELETE FROM salidas WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ success: true });
+});
+
+app.put('/api/movimientos/SALIDA/:id', (req, res) => {
+  const { id } = req.params;
+  const { fecha, hora, descripcion, monto, cuenta } = req.body;
+  const fechaHora = `${fecha} ${hora}`;
+  const createdAt = Math.floor(Date.now() / 1000);
+  db.prepare('UPDATE salidas SET fecha_hora=?, descripcion=?, monto=?, cuenta=?, created_at=? WHERE id=?')
+    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt, parseInt(id));
   res.json({ success: true });
 });
 
 // ========== MOVIMIENTOS ==========
 app.get('/api/movimientos', (req, res) => {
-  const ingresos = db.prepare("SELECT *, 'INGRESO' as tipo FROM ingresos").all();
-  const salidas = db.prepare("SELECT *, 'SALIDA' as tipo FROM salidas").all();
+  const { mes, anio } = req.query;
+  let where = '';
+  let params = [];
+
+  if (mes && anio) {
+    const mesStr = String(mes).padStart(2, '0');
+    where = "WHERE fecha_hora LIKE ?";
+    params = [`${anio}-${mesStr}%`];
+  }
+
+  const ingresos = db.prepare(`SELECT *, 'INGRESO' as tipo FROM ingresos ${where}`).all(...params);
+  const salidas = db.prepare(`SELECT *, 'SALIDA' as tipo FROM salidas ${where}`).all(...params);
 
   const movimientos = [
     ...ingresos.map(i => ({
@@ -145,6 +246,22 @@ app.get('/api/movimientos', (req, res) => {
 
   movimientos.sort((a, b) => b.createdAt - a.createdAt);
   res.json(movimientos);
+});
+
+// ========== TOTALES MES ACTUAL ==========
+app.get('/api/resumen/mes-actual', (req, res) => {
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+  const prefix = `${anio}-${mes}`;
+
+  const ingresos = db.prepare("SELECT monto FROM ingresos WHERE fecha_hora LIKE ?").all(`${prefix}%`);
+  const salidas = db.prepare("SELECT monto FROM salidas WHERE fecha_hora LIKE ?").all(`${prefix}%`);
+
+  const totalIngresos = ingresos.reduce((a, i) => a + i.monto, 0);
+  const totalSalidas = salidas.reduce((a, s) => a + s.monto, 0);
+
+  res.json({ anio, mes, ingresos: totalIngresos, salidas: totalSalidas });
 });
 
 // ========== ELIMINAR MOVIMIENTO ==========
@@ -288,41 +405,6 @@ app.delete('/api/pendientes/:id', (req, res) => {
 });
 
 
-// ========== CONSULTA PENDIENTES PARA SHORTCUTS ==========
-app.get('/api/consulta/pendientes', (req, res) => {
-  const pendientes = db.prepare("SELECT * FROM pendientes WHERE pagado != 'OK' AND monto_mensual > 0").all();
-
-  if (!pendientes.length) {
-    res.json({ success: true, message: '✅ No tienes pagos pendientes' });
-    return;
-  }
-
-  // Agrupar por categoría
-  const grupos = {};
-  pendientes.forEach(p => {
-    const cat = p.categoria || 'Sin categoría';
-    if (!grupos[cat]) grupos[cat] = [];
-    grupos[cat].push(p);
-  });
-
-  let mensaje = '📋 PENDIENTES POR PAGAR:\n\n';
-  let totalGeneral = 0;
-
-  Object.keys(grupos).sort().forEach(cat => {
-    const totalCat = grupos[cat].reduce((s, p) => s + Math.max(p.monto_mensual - (p.abono || 0), 0), 0);
-    mensaje += `📁 ${cat} ($${totalCat.toLocaleString('es-CO')})\n`;
-    grupos[cat].forEach(p => {
-      const faltante = Math.max(p.monto_mensual - (p.abono || 0), 0);
-      mensaje += `  · ${p.descripcion}: $${faltante.toLocaleString('es-CO')}\n`;
-    });
-    totalGeneral += totalCat;
-    mensaje += '\n';
-  });
-
-  mensaje += `💰 TOTAL: $${totalGeneral.toLocaleString('es-CO')}`;
-
-  res.json({ success: true, message: mensaje });
-});
 // ========== INICIO ==========
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

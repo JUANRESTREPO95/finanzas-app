@@ -1,0 +1,952 @@
+const API = '';
+
+let todosLosMovimientos = [];
+let todasLasCuentas = [];
+let todosLosPendientes = [];
+let filtroMovimientos = 'todos';
+let menuAbierto = false;
+let tipoTransaccion = 'INGRESO';
+let mesSelector = { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 };
+
+// ===== UTILIDADES =====
+function $(id) { return document.getElementById(id); }
+
+function formatMonto(valor) {
+  return '$' + Number(valor || 0).toLocaleString('es-CO');
+}
+
+function escapeHtml(text) {
+  if (!text && text !== 0) return '';
+  return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function fechaActual() {
+  const ahora = new Date();
+  return `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+}
+
+function horaActual() {
+  const ahora = new Date();
+  return `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+}
+
+function mostrarToast(msg) {
+  const toast = $('toast');
+  toast.textContent = msg;
+  toast.classList.add('active');
+  setTimeout(() => toast.classList.remove('active'), 2200);
+}
+
+function abrirModal(id) {
+  $(id).classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModal(id) {
+  $(id).classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function nombreMes(mesNum) {
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return meses[mesNum - 1];
+}
+
+// ===== INICIALIZACIÓN =====
+window.onload = function() {
+  aplicarModoOscuroGuardado();
+  inicializarNavegacion();
+  inicializarFAB();
+  inicializarModalTransaccion();
+  inicializarModales();
+  inicializarSelectorMes();
+
+  cargarDatosIniciales();
+};
+
+function cargarDatosIniciales() {
+  cargarCuentas().then(() => {
+    cargarDashboard();
+    cargarMovimientos();
+    cargarPendientes();
+  });
+}
+
+function aplicarModoOscuroGuardado() {
+  if (localStorage.getItem('modoOscuro') === 'true') {
+    document.body.classList.add('dark');
+    $('btnModoOscuro')?.classList.add('active');
+    $('btnModoOscuro')?.querySelector('.config-toggle')?.classList.add('active');
+  }
+}
+
+function toggleModoOscuro() {
+  const esOscuro = document.body.classList.toggle('dark');
+  localStorage.setItem('modoOscuro', esOscuro);
+  $('btnModoOscuro')?.classList.toggle('active', esOscuro);
+  $('btnModoOscuro')?.querySelector('.config-toggle')?.classList.toggle('active', esOscuro);
+}
+
+// ===== NAVEGACIÓN =====
+function inicializarNavegacion() {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const screenId = item.dataset.screen;
+      cambiarPantalla(screenId);
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  $('btnVerTodasCuentas').addEventListener('click', () => {
+    cambiarPantalla('screen-cuentas');
+    actualizarNav('screen-cuentas');
+  });
+
+  $('btnVerTodosMovimientos').addEventListener('click', () => {
+    cambiarPantalla('screen-movimientos');
+    actualizarNav('screen-movimientos');
+  });
+
+  $('btnAddPendiente').addEventListener('click', () => {
+    abrirModalGestionPendientes(true);
+  });
+}
+
+function cambiarPantalla(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function actualizarNav(screenId) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const item = document.querySelector(`.nav-item[data-screen="${screenId}"]`);
+  if (item) item.classList.add('active');
+}
+
+// ===== CARGA DE DATOS =====
+function cargarCuentas() {
+  return fetch(`${API}/api/cuentas`).then(r => r.json()).then(cuentas => {
+    todasLasCuentas = cuentas;
+    return cuentas;
+  });
+}
+
+function cargarDashboard() {
+  Promise.all([
+    fetch(`${API}/api/totales`).then(r => r.json()),
+    fetch(`${API}/api/totales/sin-ahorros`).then(r => r.json()),
+    fetch(`${API}/api/movimientos?mes=${mesSelector.mes}&anio=${mesSelector.anio}`).then(r => r.json()),
+    fetch(`${API}/api/resumen/mes-actual`).then(r => r.json())
+  ]).then(([totalesResp, totalDisp, movimientos, resumenMes]) => {
+    const totales = totalesResp.cuentas;
+    const grupos = totalesResp.grupos || [];
+
+    const visibles = todasLasCuentas.filter(c => c.incluir_en_total).map(c => c.nombre);
+    const totalPatrimonio = visibles.reduce((acc, c) => acc + (totales[c] || 0), 0);
+    $('patrimonioTotal').textContent = formatMonto(totalPatrimonio);
+
+    // Mostrar grupos debajo del patrimonio
+    const gruposEl = $('gruposResumen');
+    if (gruposEl) {
+      if (grupos.length) {
+        gruposEl.innerHTML = grupos.map(g => `
+          <div class="grupo-resumen">
+            <span class="grupo-nombre">${escapeHtml(g.nombre)}</span>
+            <span class="grupo-monto">${formatMonto(g.total)}</span>
+          </div>
+        `).join('');
+      } else {
+        gruposEl.innerHTML = '';
+      }
+    }
+
+    $('totalSinAhorros') && ($('totalSinAhorros').textContent = formatMonto(totalDisp.total));
+
+    $('resumenIngresos').textContent = formatMonto(resumenMes.ingresos);
+    $('resumenSalidas').textContent = formatMonto(resumenMes.salidas);
+
+    renderCuentasCarousel(totales);
+    renderDashboardMovimientos(movimientos.slice(0, 6));
+    renderCuentasGrid(totales);
+  });
+}
+
+function renderCuentasCarousel(totales) {
+  const icons = ['💳', '💵', '🏦', '💰', '📱', '🪙'];
+  const html = todasLasCuentas.map((c, i) => `
+    <div class="cuenta-mini">
+      <div class="cuenta-mini-top">
+        <span class="cuenta-mini-nombre">${escapeHtml(c.nombre)}</span>
+        <span class="cuenta-mini-icono">${icons[i % icons.length]}</span>
+      </div>
+      <span class="cuenta-mini-monto">${formatMonto(totales[c.nombre] || 0)}</span>
+    </div>
+  `).join('');
+
+  $('cuentasCarousel').innerHTML = html;
+}
+
+function renderCuentasGrid(totales) {
+  const icons = ['💳', '💵', '🏦', '💰', '📱', '🪙'];
+  const totalDisp = Object.entries(totales)
+    .filter(([nombre]) => {
+      const c = todasLasCuentas.find(x => x.nombre === nombre);
+      return c && c.incluir_en_total;
+    })
+    .reduce((a, [,monto]) => a + monto, 0);
+
+  const html = `
+    <div class="cuenta-big cuenta-big-total">
+      <div class="cuenta-big-header">
+        <span class="cuenta-big-nombre">Total disponible</span>
+        <span class="cuenta-big-icono">✨</span>
+      </div>
+      <span class="cuenta-big-monto">${formatMonto(totalDisp)}</span>
+    </div>
+  ` + todasLasCuentas.map((c, i) => `
+    <div class="cuenta-big">
+      <div class="cuenta-big-header">
+        <span class="cuenta-big-nombre">${escapeHtml(c.nombre)}</span>
+        <span class="cuenta-big-icono">${icons[i % icons.length]}</span>
+      </div>
+      <span class="cuenta-big-monto">${formatMonto(totales[c.nombre] || 0)}</span>
+    </div>
+  `).join('');
+
+  $('cuentasGrid').innerHTML = html;
+}
+
+function renderDashboardMovimientos(movimientos) {
+  $('dashboardMovimientos').innerHTML = renderMovimientosHTML(movimientos, true);
+}
+
+function renderMovimientosHTML(movimientos, limitar = false) {
+  if (!movimientos.length) {
+    return '<div class="mensaje-vacio">No hay movimientos</div>';
+  }
+
+  let html = '';
+  let ultimaFecha = '';
+  const lista = limitar && movimientos.length > 10 ? movimientos.slice(0, 10) : movimientos;
+
+  lista.forEach((mov, idx) => {
+    const fecha = mov.fechaHora ? mov.fechaHora.split(' ')[0] : '';
+    if (fecha && fecha !== ultimaFecha) {
+      html += `<div class="fecha-divider">${formatearFecha(fecha)}</div>`;
+      ultimaFecha = fecha;
+    }
+
+    const tipoClass = mov.tipo === 'INGRESO' ? 'ingreso' : 'salida';
+    const signo = mov.tipo === 'INGRESO' ? '+' : '−';
+    const icono = mov.tipo === 'INGRESO' ? '↓' : '↑';
+    html += `
+      <div class="movimiento-row" onclick="editarMovimiento(${idx})">
+        <div class="movimiento-avatar ${tipoClass}">${icono}</div>
+        <div class="movimiento-body">
+          <div class="movimiento-title">${escapeHtml(mov.detalle)}</div>
+          <div class="movimiento-subtitle">${escapeHtml(mov.cuenta)} · ${mov.fechaHora?.split(' ')[1] || ''}</div>
+        </div>
+        <div class="movimiento-amount ${tipoClass}">${signo}${mov.monto.toLocaleString('es-CO')}</div>
+      </div>`;
+  });
+
+  if (limitar && movimientos.length > 10) {
+    html += `<button class="btn-text" style="margin-top:10px;text-align:center;width:100%;" onclick="verMasMovimientos()">Ver ${movimientos.length - 10} más</button>`;
+  }
+
+  return html;
+}
+
+function formatearFecha(fechaStr) {
+  const hoy = fechaActual();
+  if (fechaStr === hoy) return 'Hoy';
+  const ayer = new Date();
+  ayer.setDate(ayer.getDate() - 1);
+  const ayerStr = `${ayer.getFullYear()}-${String(ayer.getMonth()+1).padStart(2,'0')}-${String(ayer.getDate()).padStart(2,'0')}`;
+  if (fechaStr === ayerStr) return 'Ayer';
+  return new Date(fechaStr).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function inicializarSelectorMes() {
+  const prev = $('mesPrev');
+  const next = $('mesNext');
+  const label = $('mesLabel');
+  if (!prev || !next || !label) return;
+
+  const actualizarLabel = () => {
+    label.textContent = `${nombreMes(mesSelector.mes)} ${mesSelector.anio}`;
+  };
+
+  prev.addEventListener('click', () => {
+    mesSelector.mes--;
+    if (mesSelector.mes < 1) { mesSelector.mes = 12; mesSelector.anio--; }
+    actualizarLabel();
+    cargarMovimientos();
+  });
+
+  next.addEventListener('click', () => {
+    mesSelector.mes++;
+    if (mesSelector.mes > 12) { mesSelector.mes = 1; mesSelector.anio++; }
+    actualizarLabel();
+    cargarMovimientos();
+  });
+
+  actualizarLabel();
+}
+
+function cargarMovimientos() {
+  fetch(`${API}/api/movimientos?mes=${mesSelector.mes}&anio=${mesSelector.anio}`).then(r => r.json()).then(movs => {
+    todosLosMovimientos = movs;
+    aplicarFiltroMovimientos();
+  });
+}
+
+function aplicarFiltroMovimientos() {
+  const filtrados = filtroMovimientos === 'todos'
+    ? todosLosMovimientos
+    : todosLosMovimientos.filter(m => m.tipo === filtroMovimientos);
+
+  $('todosMovimientos').innerHTML = renderMovimientosHTML(filtrados);
+}
+
+function verMasMovimientos() {
+  cambiarPantalla('screen-movimientos');
+  actualizarNav('screen-movimientos');
+}
+
+// ===== PENDIENTES =====
+function cargarPendientes() {
+  fetch(`${API}/api/pendientes`).then(r => r.json()).then(pendientes => {
+    todosLosPendientes = pendientes;
+    renderPendientes(pendientes);
+  });
+}
+
+function renderPendientes(pendientes) {
+  const total = pendientes.reduce((s, p) => s + (p.faltante || 0), 0);
+  $('totalPendientes').textContent = formatMonto(total);
+
+  if (!pendientes.length) {
+    $('todosPendientes').innerHTML = '<div class="mensaje-vacio">No hay pendientes</div>';
+    return;
+  }
+
+  const grupos = {};
+  pendientes.forEach(p => {
+    const cat = p.categoria || 'Sin categoría';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  let html = '';
+  Object.keys(grupos).sort((a,b) => a.localeCompare(b,'es',{sensitivity:'base'})).forEach(cat => {
+    const totalCat = grupos[cat].reduce((s,p) => s + (p.faltante||0), 0);
+    html += `
+      <div class="pendiente-card">
+        <div class="pendiente-card-header">
+          <span>${escapeHtml(cat)}</span>
+          <span class="pendiente-card-total">${formatMonto(totalCat)}</span>
+        </div>
+        ${grupos[cat].map(p => `
+          <div class="pendiente-item ${p.faltante <= 0 ? 'paid' : ''}">
+            <div class="pendiente-item-info">
+              <div class="pendiente-item-desc">${escapeHtml(p.descripcion)}</div>
+              <div class="pendiente-item-meta">Vence: ${p.fecha} · Total: ${formatMonto(p.montoMensual)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="pendiente-item-monto">${formatMonto(p.faltante)}</span>
+              ${p.faltante > 0 ? `<button class="btn-icon small" onclick="abrirAbono(${p.id})">+</button>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  });
+
+  $('todosPendientes').innerHTML = html;
+}
+
+// ===== FAB MENÚ =====
+function inicializarFAB() {
+  $('fabMain').addEventListener('click', () => {
+    menuAbierto = !menuAbierto;
+    $('fabMain').classList.toggle('active', menuAbierto);
+    $('fabMenu').classList.toggle('visible', menuAbierto);
+  });
+
+  document.querySelectorAll('.fab-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      if (action === 'ingreso') abrirTransaccion('INGRESO');
+      if (action === 'salida') abrirTransaccion('SALIDA');
+      if (action === 'transferencia') abrirTransaccion('TRANSFERENCIA');
+      cerrarFAB();
+    });
+  });
+
+  document.addEventListener('click', e => {
+    const fab = document.querySelector('.fab-main');
+    const menu = document.querySelector('.fab-menu');
+    if (menuAbierto && !fab.contains(e.target) && !menu.contains(e.target)) {
+      cerrarFAB();
+    }
+  });
+}
+
+function cerrarFAB() {
+  menuAbierto = false;
+  $('fabMain').classList.remove('active');
+  $('fabMenu').classList.remove('visible');
+}
+
+// ===== MODAL TRANSACCIÓN =====
+function inicializarModalTransaccion() {
+  document.querySelectorAll('#tipoSwitch .tipo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tipoSwitch .tipo-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setTipoTransaccion(btn.dataset.tipo);
+    });
+  });
+
+  $('btnGuardarTransaccion').addEventListener('click', guardarTransaccion);
+  $('btnCerrarTransaccion').addEventListener('click', () => cerrarModal('modalTransaccion'));
+}
+
+function setTipoTransaccion(tipo) {
+  tipoTransaccion = tipo;
+  $('modalTransaccionTitulo').textContent = tipo === 'INGRESO' ? 'Nuevo ingreso' : tipo === 'SALIDA' ? 'Nuevo gasto' : 'Mover dinero';
+
+  if (tipo === 'TRANSFERENCIA') {
+    $('rowOrigenDestino').style.display = 'flex';
+    $('rowCuenta').style.display = 'none';
+  } else {
+    $('rowOrigenDestino').style.display = 'none';
+    $('rowCuenta').style.display = 'block';
+  }
+
+  if (tipo === 'INGRESO') {
+    $('btnGuardarTransaccion').className = 'btn-giant';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #10b981, #059669)';
+  } else if (tipo === 'SALIDA') {
+    $('btnGuardarTransaccion').className = 'btn-giant';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+  } else {
+    $('btnGuardarTransaccion').className = 'btn-giant';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+  }
+}
+
+function abrirTransaccion(tipo, datos = null) {
+  setTipoTransaccion(tipo);
+  $('transaccionEditId').value = '';
+  $('transaccionEditTipo').value = '';
+  $('transaccionMonto').value = '';
+  $('transaccionDescripcion').value = '';
+  $('transaccionFecha').value = fechaActual();
+  $('transaccionHora').value = horaActual();
+
+  // Llenar selects
+  const opts = todasLasCuentas.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  $('transaccionCuenta').innerHTML = opts;
+  $('transaccionCuentaOrigen').innerHTML = opts;
+  $('transaccionCuentaDestino').innerHTML = opts;
+
+  if (datos) {
+    $('transaccionEditId').value = datos.id;
+    $('transaccionEditTipo').value = datos.tipo;
+    $('transaccionMonto').value = datos.monto;
+    $('transaccionDescripcion').value = datos.detalle;
+    $('transaccionFecha').value = datos.fechaHora.split(' ')[0];
+    $('transaccionHora').value = datos.fechaHora.split(' ')[1] || horaActual();
+    if (tipo === 'TRANSFERENCIA') {
+      $('transaccionCuentaOrigen').value = datos.cuentaOrigen;
+      $('transaccionCuentaDestino').value = datos.cuentaDestino;
+    } else {
+      $('transaccionCuenta').value = datos.cuenta;
+    }
+    $('btnGuardarTransaccion').textContent = 'Actualizar';
+  } else {
+    $('btnGuardarTransaccion').textContent = 'Guardar';
+  }
+
+  abrirModal('modalTransaccion');
+}
+
+function guardarTransaccion() {
+  const btn = $('btnGuardarTransaccion');
+  const monto = parseFloat($('transaccionMonto').value || 0);
+  const descripcion = $('transaccionDescripcion').value.trim();
+  const fecha = $('transaccionFecha').value;
+  const hora = $('transaccionHora').value;
+  const editId = $('transaccionEditId').value;
+  const editTipo = $('transaccionEditTipo').value;
+
+  if (!fecha || !descripcion || monto <= 0) {
+    mostrarToast('Completa todos los campos'); return;
+  }
+
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = 'Guardando...';
+
+  if (editId && editTipo !== 'TRANSFERENCIA') {
+    fetch(`${API}/api/movimientos/${editTipo}/${editId}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fecha, hora, descripcion, monto, cuenta: $('transaccionCuenta').value })
+    })
+    .then(r => r.json())
+    .then(res => finalizarTransaccion(res, btn, textoOriginal));
+    return;
+  }
+
+  if (tipoTransaccion === 'TRANSFERENCIA') {
+    const origen = $('transaccionCuentaOrigen').value;
+    const destino = $('transaccionCuentaDestino').value;
+    if (origen === destino) { mostrarToast('Las cuentas deben ser diferentes'); btn.disabled = false; btn.textContent = textoOriginal; return; }
+
+    fetch(`${API}/api/transferencia`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ cuentaOrigen: origen, cuentaDestino: destino, monto, descripcion })
+    })
+    .then(r => r.json())
+    .then(res => finalizarTransaccion(res, btn, textoOriginal));
+  } else {
+    const endpoint = tipoTransaccion === 'INGRESO' ? 'ingresos' : 'salidas';
+    fetch(`${API}/api/${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fecha, hora, descripcion, monto, cuenta: $('transaccionCuenta').value })
+    })
+    .then(r => r.json())
+    .then(res => finalizarTransaccion(res, btn, textoOriginal));
+  }
+}
+
+function finalizarTransaccion(res, btn, textoOriginal) {
+  btn.disabled = false;
+  btn.textContent = textoOriginal;
+  if (res.success) {
+    cerrarModal('modalTransaccion');
+    mostrarToast('Guardado ✅');
+    recargarTodo();
+  } else {
+    mostrarToast('Error: ' + res.message);
+  }
+}
+
+function editarMovimiento(index) {
+  const mov = todosLosMovimientos[index];
+  if (!mov) return;
+  abrirTransaccion(mov.tipo, mov);
+}
+
+// ===== FILTROS =====
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    filtroMovimientos = chip.dataset.filtro;
+    aplicarFiltroMovimientos();
+  });
+});
+
+// ===== MODALES GENERALES =====
+function inicializarModales() {
+  $('btnConfig').addEventListener('click', () => abrirModal('modalConfig'));
+  $('btnCerrarConfig').addEventListener('click', () => cerrarModal('modalConfig'));
+
+  $('btnModoOscuro').addEventListener('click', toggleModoOscuro);
+
+  document.querySelectorAll('.config-row[data-seccion]').forEach(row => {
+    row.addEventListener('click', () => {
+      const sec = row.dataset.seccion;
+      cerrarModal('modalConfig');
+      if (sec === 'cuentas') abrirModalCuentas();
+      if (sec === 'pendientes') abrirModalGestionPendientes();
+    });
+  });
+
+  $('btnCerrarCuentas').addEventListener('click', () => cerrarModal('modalCuentas'));
+  $('btnCerrarPendientes').addEventListener('click', () => cerrarModal('modalPendientes'));
+  $('btnCerrarAbono').addEventListener('click', () => cerrarModal('modalAbono'));
+
+  // Cuentas
+  $('btnAgregarCuenta').addEventListener('click', () => {
+    const nombre = $('nuevaCuenta').value.trim().toUpperCase();
+    if (!nombre) { mostrarToast('Escribe el nombre'); return; }
+    fetch(`${API}/api/cuentas`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ nombre })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        mostrarToast('Cuenta agregada ✅');
+        $('nuevaCuenta').value = '';
+        cargarCuentas().then(() => {
+          cargarListaCuentas();
+          cargarListaGrupos();
+          recargarTodo();
+        });
+      } else {
+        mostrarToast('Error: ' + res.message);
+      }
+    });
+  });
+
+  // Grupos
+  $('btnNuevoGrupo').addEventListener('click', () => mostrarFormGrupo());
+  $('btnCancelarFormGrupo').addEventListener('click', () => {
+    $('formGrupo').classList.remove('active');
+  });
+  $('btnGuardarGrupo').addEventListener('click', guardarGrupo);
+
+  // Pendientes
+  $('btnNuevoPendiente').addEventListener('click', () => mostrarFormPendiente());
+  $('btnReiniciarPendientes').addEventListener('click', () => {
+    if (!confirm('¿Reiniciar todos los abonos? Se borrarán los pagos realizados y volverán al monto completo.')) return;
+    fetch(`${API}/api/pendientes/reiniciar`, { method: 'POST' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          mostrarToast('Abonos reiniciados ✅');
+          cargarGestionPendientes();
+          cargarPendientes();
+        } else {
+          mostrarToast('Error al reiniciar');
+        }
+      });
+  });
+  $('btnNuevaCategoriaP').addEventListener('click', () => {
+    const div = $('inputNuevaCategoriaP');
+    div.style.display = div.style.display === 'none' ? 'block' : 'none';
+    if (div.style.display === 'block') $('nuevaCategoriaP').focus();
+  });
+  $('btnCancelarFormPendiente').addEventListener('click', () => {
+    $('formPendiente').classList.remove('active');
+  });
+  $('btnGuardarPendiente').addEventListener('click', guardarPendiente);
+
+  // Abono
+  $('btnGuardarAbono').addEventListener('click', guardarAbono);
+
+  // Cerrar modales al hacer click fuera
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function() {
+      cerrarModal(this.parentElement.id);
+    });
+  });
+}
+
+function recargarTodo() {
+  cargarDashboard();
+  cargarMovimientos();
+  cargarPendientes();
+}
+
+// ===== CONFIG CUENTAS =====
+function abrirModalCuentas() {
+  abrirModal('modalCuentas');
+  cargarListaCuentas();
+  cargarListaGrupos();
+}
+
+function cargarListaCuentas() {
+  fetch(`${API}/api/cuentas`).then(r => r.json()).then(cuentas => {
+    $('listaCuentas').innerHTML = cuentas.map(c => `
+      <div class="cuenta-config-row">
+        <label>
+          <input type="checkbox" ${c.incluir_en_total ? 'checked' : ''} onchange="toggleCuentaVisible('${c.nombre}', this.checked)">
+          <span>${c.nombre}</span>
+        </label>
+        <button class="btn-delete" onclick="eliminarCuenta('${c.nombre}')">Eliminar</button>
+      </div>
+    `).join('');
+  });
+}
+
+function toggleCuentaVisible(nombre, incluir) {
+  fetch(`${API}/api/cuentas/${encodeURIComponent(nombre)}/visible`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ incluir })
+  }).then(() => recargarTodo());
+}
+
+function eliminarCuenta(nombre) {
+  if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+  fetch(`${API}/api/cuentas/${encodeURIComponent(nombre)}`, { method: 'DELETE' })
+    .then(() => {
+      mostrarToast('Cuenta eliminada ✅');
+      cargarCuentas().then(() => {
+        cargarListaCuentas();
+        cargarListaGrupos();
+        recargarTodo();
+      });
+    });
+}
+
+// ===== GRUPOS DE CUENTAS =====
+function cargarListaGrupos() {
+  Promise.all([
+    fetch(`${API}/api/grupos`).then(r => r.json()),
+    fetch(`${API}/api/cuentas`).then(r => r.json())
+  ]).then(([grupos, cuentas]) => {
+    const container = $('listaGrupos');
+    if (!container) return;
+
+    if (!grupos.length) {
+      container.innerHTML = '<p class="modal-hint">No tienes grupos creados. Crea uno para unificar cuentas.</p>';
+      return;
+    }
+
+    container.innerHTML = grupos.map(g => `
+      <div class="grupo-config-card">
+        <div class="grupo-config-header">
+          <span>${escapeHtml(g.nombre)}</span>
+          <div class="grupo-config-actions">
+            <button class="btn-icon small" onclick="editarGrupo(${g.id}, '${escapeHtml(g.nombre)}', ${JSON.stringify(g.cuentas).replace(/"/g,'&quot;')})">✎</button>
+            <button class="btn-icon small" onclick="eliminarGrupo(${g.id})">🗑</button>
+          </div>
+        </div>
+        <div class="grupo-config-cuentas">${g.cuentas.map(c => `<span class="chip-cuenta">${escapeHtml(c)}</span>`).join('')}</div>
+      </div>
+    `).join('');
+
+    // Actualizar opciones del form
+    const opts = cuentas.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+    $('grupoCuentasSelect').innerHTML = opts;
+  });
+}
+
+function mostrarFormGrupo(id = null, nombre = '', cuentasSeleccionadas = []) {
+  $('grupoEditId').value = id || '';
+  $('grupoNombre').value = nombre;
+  $('formGrupo').classList.add('active');
+
+  fetch(`${API}/api/cuentas`).then(r => r.json()).then(cuentas => {
+    const container = $('grupoCuentasCheckboxes');
+    container.innerHTML = cuentas.map(c => `
+      <label class="checkbox-pill">
+        <input type="checkbox" value="${c.nombre}" ${cuentasSeleccionadas.includes(c.nombre) ? 'checked' : ''}>
+        <span>${c.nombre}</span>
+      </label>
+    `).join('');
+  });
+}
+
+function editarGrupo(id, nombre, cuentas) {
+  mostrarFormGrupo(id, nombre, cuentas);
+}
+
+function guardarGrupo() {
+  const id = $('grupoEditId').value;
+  const nombre = $('grupoNombre').value.trim();
+  const checkboxes = $('grupoCuentasCheckboxes').querySelectorAll('input[type="checkbox"]:checked');
+  const cuentas = Array.from(checkboxes).map(cb => cb.value);
+
+  if (!nombre) { mostrarToast('Escribe el nombre del grupo'); return; }
+  if (cuentas.length === 0) { mostrarToast('Selecciona al menos una cuenta'); return; }
+
+  const url = id ? `${API}/api/grupos/${id}` : `${API}/api/grupos`;
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ nombre, cuentas })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      mostrarToast(id ? 'Grupo actualizado ✅' : 'Grupo creado ✅');
+      $('formGrupo').classList.remove('active');
+      $('grupoNombre').value = '';
+      $('grupoEditId').value = '';
+      cargarListaGrupos();
+      recargarTodo();
+    } else {
+      mostrarToast('Error: ' + res.message);
+    }
+  });
+}
+
+function eliminarGrupo(id) {
+  if (!confirm('¿Eliminar este grupo?')) return;
+  fetch(`${API}/api/grupos/${id}`, { method: 'DELETE' })
+    .then(() => {
+      mostrarToast('Grupo eliminado ✅');
+      cargarListaGrupos();
+      recargarTodo();
+    });
+}
+
+// ===== GESTIÓN PENDIENTES =====
+function abrirModalGestionPendientes(autoNuevo = false) {
+  abrirModal('modalPendientes');
+  $('formPendiente').classList.remove('active');
+  cargarGestionPendientes();
+  if (autoNuevo) setTimeout(mostrarFormPendiente, 250);
+}
+
+function cargarGestionPendientes() {
+  fetch(`${API}/api/pendientes/cats`).then(r => r.json()).then(cats => {
+    $('pendienteCategoria').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  });
+
+  fetch(`${API}/api/pendientes/all`).then(r => r.json()).then(pendientes => {
+    const grupos = {};
+    pendientes.forEach(p => {
+      const cat = p.categoria || 'Sin categoría';
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(p);
+    });
+
+    if (!pendientes.length) {
+      $('listaGestionPendientes').innerHTML = '<div class="mensaje-vacio">No hay pendientes</div>';
+      return;
+    }
+
+    let html = '';
+    Object.keys(grupos).sort((a,b) => a.localeCompare(b,'es',{sensitivity:'base'})).forEach(cat => {
+      html += `
+        <div class="gestion-categoria">
+          <div class="gestion-categoria-header">
+            <span>${escapeHtml(cat)}</span>
+            <button onclick="eliminarCategoriaPendiente('${cat}')">Eliminar</button>
+          </div>
+          ${grupos[cat].map(p => `
+            <div class="gestion-pendiente-row">
+              <div class="gestion-pendiente-info">
+                <div class="gestion-pendiente-desc">${escapeHtml(p.descripcion)}</div>
+                <div class="gestion-pendiente-meta">${formatMonto(p.montoMensual)} · Vence: ${p.fecha} ${p.pagado === 'OK' ? '✅' : ''}</div>
+              </div>
+              <div class="gestion-pendiente-actions">
+                <button class="btn-icon small" onclick="editarPendiente(${p.id})">✎</button>
+                <button class="btn-icon small" onclick="eliminarPendienteById(${p.id})">🗑</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
+    });
+
+    $('listaGestionPendientes').innerHTML = html;
+  });
+}
+
+function mostrarFormPendiente() {
+  $('pendienteEditId').value = '';
+  $('pendienteDesc').value = '';
+  $('pendienteMonto').value = '';
+  $('pendienteFecha').value = '';
+  $('nuevaCategoriaP').value = '';
+  $('inputNuevaCategoriaP').style.display = 'none';
+  $('formPendiente').classList.add('active');
+  $('pendienteDesc').focus();
+}
+
+function editarPendiente(id) {
+  const p = todosLosPendientes.find(x => x.id === id);
+  if (!p) return;
+  $('pendienteEditId').value = p.id;
+  $('pendienteDesc').value = p.descripcion;
+  $('pendienteMonto').value = p.montoMensual;
+  $('pendienteFecha').value = p.fecha;
+  $('pendienteCategoria').value = p.categoria;
+  $('nuevaCategoriaP').value = '';
+  $('inputNuevaCategoriaP').style.display = 'none';
+  $('formPendiente').classList.add('active');
+  $('formPendiente').scrollIntoView({ behavior: 'smooth' });
+}
+
+function guardarPendiente() {
+  const id = $('pendienteEditId').value;
+  const descripcion = $('pendienteDesc').value.trim().toUpperCase();
+  const montoMensual = parseFloat($('pendienteMonto').value || 0);
+  const fecha = $('pendienteFecha').value.trim();
+  const nuevaCat = $('nuevaCategoriaP').value.trim().toUpperCase();
+  const categoria = nuevaCat || $('pendienteCategoria').value;
+
+  if (!descripcion || montoMensual <= 0) { mostrarToast('Completa descripción y monto'); return; }
+
+  const datos = { fecha, descripcion, montoMensual, categoria };
+  const url = id ? `${API}/api/pendientes/${id}` : `${API}/api/pendientes/nuevo`;
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(datos)
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      mostrarToast(id ? 'Pendiente actualizado ✅' : 'Pendiente agregado ✅');
+      $('formPendiente').classList.remove('active');
+      $('nuevaCategoriaP').value = '';
+      cargarGestionPendientes();
+      cargarPendientes();
+    } else {
+      mostrarToast('Error: ' + res.message);
+    }
+  });
+}
+
+function eliminarPendienteById(id) {
+  if (!confirm('¿Eliminar este pendiente?')) return;
+  fetch(`${API}/api/pendientes/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(() => {
+      mostrarToast('Pendiente eliminado ✅');
+      cargarGestionPendientes();
+      cargarPendientes();
+    });
+}
+
+function eliminarCategoriaPendiente(cat) {
+  if (!confirm(`¿Eliminar toda la categoría "${cat}"?`)) return;
+  fetch(`${API}/api/pendientes/categoria/${encodeURIComponent(cat)}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(() => {
+      mostrarToast('Categoría eliminada ✅');
+      cargarGestionPendientes();
+      cargarPendientes();
+    });
+}
+
+// ===== ABONO RÁPIDO =====
+function abrirAbono(id) {
+  const p = todosLosPendientes.find(x => x.id === id);
+  if (!p) return;
+  $('abonoId').value = p.id;
+  $('abonoTitulo').textContent = `Abonar a ${p.descripcion}`;
+  $('abonoHint').textContent = `Restante: ${formatMonto(p.faltante)}`;
+  $('abonoMonto').value = '';
+  abrirModal('modalAbono');
+}
+
+function guardarAbono() {
+  const id = parseInt($('abonoId').value);
+  const monto = parseFloat($('abonoMonto').value || 0);
+  if (monto <= 0) { mostrarToast('Ingresa un monto'); return; }
+
+  fetch(`${API}/api/pendientes/abono`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ items: [{ id, incrementoAbono: monto }] })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      mostrarToast('Abono guardado ✅');
+      cerrarModal('modalAbono');
+      cargarPendientes();
+    } else {
+      mostrarToast('Error al guardar');
+    }
+  });
+}

@@ -35,12 +35,16 @@ db.exec(`
     categoria TEXT
   );
 
-
-
   CREATE TABLE IF NOT EXISTS cuentas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT NOT NULL UNIQUE,
     incluir_en_total INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS grupos_cuentas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    cuentas TEXT NOT NULL DEFAULT '[]'
   );
 `);
 
