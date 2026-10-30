@@ -1143,12 +1143,54 @@ body.dark .bottom-nav {
 .form-row {
   display: flex;
   gap: 10px;
+  /* Sin esto, la fila crece hasta el ancho mínimo de los inputs nativos
+     de fecha/hora y se sale del padding derecho del modal. */
+  min-width: 0;
 }
 
 .form-group.half {
   flex: 1 1 0;
   min-width: 0;
   margin-bottom: 10px;
+}
+
+/* Fecha y hora: dos columnas exactas. Con flex, los controles nativos de
+   fecha/hora imponen su ancho intrínseco y la fila se sale por la derecha. */
+#filaFechaHora {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+#filaFechaHora .form-group.half {
+  min-width: 0;
+  width: auto;
+}
+
+#filaFechaHora input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* iOS Safari dibuja los campos de fecha/hora con su propio ancho y se salen
+   de la columna. Sin el aspecto nativo respetan el ancho como un input normal
+   y el selector de fecha/hora sigue abriéndose al tocar. Solo en móvil, para
+   no perder el icono del calendario en escritorio. */
+@media (max-width: 700px) {
+  .form-group input[type="date"],
+  .form-group input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    text-align: left;
+  }
 }
 
 /* Los input de fecha/hora tienen un ancho mínimo propio en móvil y
