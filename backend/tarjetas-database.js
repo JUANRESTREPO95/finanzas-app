@@ -80,6 +80,11 @@ function inicializar() {
       estado TEXT NOT NULL DEFAULT 'PENDIENTE',
       creado_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER))
     );
+
+    CREATE TABLE IF NOT EXISTS ajustes (
+      clave TEXT PRIMARY KEY,
+      valor TEXT
+    );
   `);
 
   // Asegurar que compras antiguas de 1 cuota tengan cuota_mensual

@@ -31,6 +31,25 @@ function cuotasValidas(valor) {
   return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
+// ===== AJUSTES SIMPLES (clave/valor) =====
+const CLAVE_DESTACADAS = 'resumen_tarjetas';
+
+function leerAjuste(clave, porDefecto) {
+  const fila = db.prepare('SELECT valor FROM ajustes WHERE clave = ?').get(clave);
+  if (!fila) return porDefecto;
+  try {
+    return JSON.parse(fila.valor);
+  } catch (e) {
+    return porDefecto;
+  }
+}
+
+function guardarAjuste(clave, valor) {
+  db.prepare(`INSERT INTO ajustes (clave, valor) VALUES (?, ?)
+              ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor`)
+    .run(clave, JSON.stringify(valor));
+}
+
 function calcularTasaAnual(tasaMensual) {
   return (Math.pow(1 + tasaMensual / 100, 12) - 1) * 100;
 }
@@ -94,6 +113,42 @@ router.post('/', (req, res) => {
   res.json({ success: true, id: info.lastInsertRowid });
 });
 
+// ===== TARJETAS DESTACADAS EN EL RESUMEN =====
+// (van antes de /:id para que Express no las tome como un id)
+router.get('/destacadas', (req, res) => {
+  const ids = leerAjuste(CLAVE_DESTACADAS, []);
+  const tarjetas = ids
+    .map(id => db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(id))
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(t => ({
+      id: t.id,
+      nombre: t.nombre,
+      franquicia: t.franquicia,
+      color: t.color,
+      cupo_total: t.cupo_total,
+      deuda_actual: t.deuda_actual,
+      disponible: Math.max(0, redondear(t.cupo_total - t.deuda_actual))
+    }));
+  res.json(tarjetas);
+});
+
+router.put('/destacadas', (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.json({ success: false, message: 'Faltan datos' });
+  if (ids.length > 2) return res.json({ success: false, message: 'Máximo 2 tarjetas' });
+
+  const limpios = [...new Set(ids.map(n => parseInt(n, 10)).filter(Number.isInteger))];
+  for (const id of limpios) {
+    if (!db.prepare('SELECT 1 FROM tarjetas WHERE id = ?').get(id)) {
+      return res.json({ success: false, message: 'Tarjeta no encontrada' });
+    }
+  }
+
+  guardarAjuste(CLAVE_DESTACADAS, limpios);
+  res.json({ success: true, ids: limpios });
+});
+
 router.put('/:id', (req, res) => {
   const { id } = req.params;
   const {
@@ -142,6 +197,9 @@ router.delete('/:id', (req, res) => {
   const eliminarTarjeta = db.transaction((tarjetaId) => {
     db.prepare('DELETE FROM simulaciones WHERE tarjeta_id = ?').run(tarjetaId);
     db.prepare('DELETE FROM tarjetas WHERE id = ?').run(tarjetaId);
+    // Si estaba en el resumen del inicio, se quita de la selección.
+    const seleccion = leerAjuste(CLAVE_DESTACADAS, []).filter(x => x !== tarjetaId);
+    guardarAjuste(CLAVE_DESTACADAS, seleccion);
   });
   eliminarTarjeta(id);
   res.json({ success: true });

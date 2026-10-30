@@ -202,8 +202,8 @@ function cargarDashboard() {
   Promise.all([
     fetch(`${API}/api/totales`).then(r => r.json()),
     fetch(`${API}/api/movimientos?mes=${mesSelector.mes}&anio=${mesSelector.anio}`).then(r => r.json()),
-    fetch(`${API}/api/resumen/mes-actual`).then(r => r.json())
-  ]).then(([totalesResp, movimientos, resumenMes]) => {
+    fetch(`${API}/api/tarjetas/destacadas`).then(r => r.json()).catch(() => [])
+  ]).then(([totalesResp, movimientos, tarjetasDestacadas]) => {
     const totales = totalesResp.cuentas;
     const grupos = totalesResp.grupos || [];
 
@@ -226,9 +226,7 @@ function cargarDashboard() {
       }
     }
 
-    $('resumenIngresos').textContent = formatMonto(resumenMes.ingresos);
-    $('resumenSalidas').textContent = formatMonto(resumenMes.salidas);
-
+    renderTarjetasHero(tarjetasDestacadas);
     renderCuentasCarousel(totales);
     renderDashboardMovimientos(movimientos.slice(0, 6));
     renderCuentasGrid(totales);
@@ -248,6 +246,31 @@ function renderCuentasCarousel(totales) {
   `).join('');
 
   $('cuentasCarousel').innerHTML = html;
+}
+
+// Tarjetas elegidas en Configuración para el resumen del inicio
+function renderTarjetasHero(tarjetas) {
+  const cont = $('tarjetasHero');
+  if (!cont) return;
+
+  if (!tarjetas || !tarjetas.length) {
+    cont.innerHTML = '';
+    return;
+  }
+
+  cont.innerHTML = tarjetas.slice(0, 2).map(t => `
+    <div class="hero-card">
+      <div class="hero-card-top">
+        <span class="hero-card-dot" style="background:${escapeHtml(t.color || '#ffffff')}"></span>
+        <span class="hero-card-nombre">${escapeHtml(t.nombre)}</span>
+      </div>
+      <div class="hero-card-figures">
+        <div><span>Cupo total</span><strong>${formatMonto(t.cupo_total)}</strong></div>
+        <div><span>Disponible</span><strong>${formatMonto(t.disponible)}</strong></div>
+        <div><span>Deuda</span><strong>${formatMonto(t.deuda_actual)}</strong></div>
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderCuentasGrid(totales) {
@@ -686,12 +709,15 @@ function inicializarModales() {
       if (sec === 'cuentas') abrirModalCuentas();
       if (sec === 'pendientes') abrirModalGestionPendientes();
       if (sec === 'configuracion-tarjetas') abrirModalTarjeta();
+      if (sec === 'resumen-tarjetas') abrirModalResumenTarjetas();
     });
   });
 
   $('btnCerrarCuentas').addEventListener('click', () => cerrarModal('modalCuentas'));
   $('btnCerrarPendientes').addEventListener('click', () => cerrarModal('modalPendientes'));
   $('btnCerrarAbono').addEventListener('click', () => cerrarModal('modalAbono'));
+  $('btnCerrarResumenTarjetas').addEventListener('click', () => cerrarModal('modalResumenTarjetas'));
+  $('btnGuardarResumenTarjetas').addEventListener('click', guardarResumenTarjetas);
 
   // Cuentas
   $('btnAgregarCuenta').addEventListener('click', () => {
@@ -1629,6 +1655,59 @@ function eliminarPago(id, e) {
     mostrarToast('Pago eliminado ✅');
     cargarTarjetasDashboard();
     if (tarjetaDetalleId) verTarjeta(tarjetaDetalleId);
+  });
+}
+
+// ===== TARJETAS EN EL RESUMEN DEL INICIO =====
+function abrirModalResumenTarjetas() {
+  abrirModal('modalResumenTarjetas');
+  $('listaResumenTarjetas').innerHTML = '<p class="modal-hint">Cargando…</p>';
+
+  Promise.all([
+    apiTarjetasGET(''),
+    apiTarjetasGET('/destacadas')
+  ]).then(([tarjetas, seleccion]) => {
+    const ids = (seleccion || []).map(t => t.id);
+    const cont = $('listaResumenTarjetas');
+
+    if (!tarjetas || !tarjetas.length) {
+      cont.innerHTML = '<p class="modal-hint">No tienes tarjetas registradas.</p>';
+      return;
+    }
+
+    cont.innerHTML = tarjetas.map(t => `
+      <label class="checkbox-pill">
+        <input type="checkbox" value="${t.id}" ${ids.includes(t.id) ? 'checked' : ''}>
+        <span>${escapeHtml(t.nombre)}</span>
+      </label>
+    `).join('');
+
+    cont.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const marcados = cont.querySelectorAll('input[type="checkbox"]:checked');
+        if (marcados.length > 2) {
+          cb.checked = false;
+          mostrarToast('Máximo 2 tarjetas');
+        }
+      });
+    });
+  }).catch(() => {
+    $('listaResumenTarjetas').innerHTML = '<p class="modal-hint">No se pudieron cargar las tarjetas.</p>';
+  });
+}
+
+function guardarResumenTarjetas() {
+  const ids = [...$('listaResumenTarjetas').querySelectorAll('input[type="checkbox"]:checked')]
+    .map(cb => parseInt(cb.value, 10));
+
+  apiTarjetasPUT('/destacadas', { ids }).then(res => {
+    if (!res.success) {
+      mostrarToast('Error: ' + (res.message || 'desconocido'));
+      return;
+    }
+    mostrarToast('Resumen actualizado ✅');
+    cerrarModal('modalResumenTarjetas');
+    cargarDashboard();
   });
 }
 

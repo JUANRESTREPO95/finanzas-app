@@ -51,18 +51,7 @@
           <span class="balance-label">Patrimonio total</span>
           <span class="balance-amount" id="patrimonioTotal">$0</span>
           <div id="gruposResumen" class="grupos-resumen"></div>
-          <div class="balance-pills">
-            <div class="pill ingreso">
-              <span class="pill-dot"></span>
-              <span class="pill-label">Ingresos</span>
-              <span class="pill-value" id="resumenIngresos">$0</span>
-            </div>
-            <div class="pill salida">
-              <span class="pill-dot"></span>
-              <span class="pill-label">Gastos</span>
-              <span class="pill-value" id="resumenSalidas">$0</span>
-            </div>
-          </div>
+          <div id="tarjetasHero" class="hero-cards"></div>
         </div>
 
         <div class="section-header">
@@ -447,6 +436,12 @@
           <span class="config-text">Gestionar pendientes</span>
           <span class="config-chevron">›</span>
         </button>
+
+        <button class="config-row" data-seccion="resumen-tarjetas">
+          <span class="config-icon">💳</span>
+          <span class="config-text">Tarjetas en el resumen</span>
+          <span class="config-chevron">›</span>
+        </button>
       </div>
       
       <div class="config-list" id="configTarjetas" style="display:none;">
@@ -597,6 +592,24 @@
       </div>
 
       <button class="btn-giant" id="btnGuardarAbono">Abonar</button>
+    </div>
+  </div>
+
+  <!-- MODAL TARJETAS EN EL RESUMEN -->
+  <div id="modalResumenTarjetas" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-card">
+      <div class="modal-drag"></div>
+      <div class="modal-header">
+        <h2>Tarjetas en el resumen</h2>
+        <button class="modal-close" id="btnCerrarResumenTarjetas">×</button>
+      </div>
+
+      <p class="modal-hint">Elige hasta 2 tarjetas para verlas en el inicio.</p>
+
+      <div id="listaResumenTarjetas" class="checkbox-grid"></div>
+
+      <button class="btn-giant" id="btnGuardarResumenTarjetas">Guardar</button>
     </div>
   </div>
 
