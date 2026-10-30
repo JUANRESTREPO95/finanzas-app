@@ -808,7 +808,7 @@ body.dark .pendiente-card {
 /* ===== FAB ===== */
 .fab-main {
   position: fixed;
-  bottom: 92px;
+  bottom: 108px;
   right: 20px;
   left: auto;
   transform: none;
@@ -844,7 +844,7 @@ body.dark .pendiente-card {
 
 .fab-menu {
   position: fixed;
-  bottom: 160px;
+  bottom: 176px;
   right: 20px;
   left: auto;
   transform: translateY(20px);
@@ -1146,8 +1146,16 @@ body.dark .bottom-nav {
 }
 
 .form-group.half {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   margin-bottom: 10px;
+}
+
+/* Los input de fecha/hora tienen un ancho mínimo propio en móvil y
+   desbordaban el borde derecho del modal. */
+.form-group.half input,
+.form-group.half select {
+  min-width: 0;
 }
 
 .monto-input {
