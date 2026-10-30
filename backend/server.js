@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./database');
 const tarjetasRoutes = require('./tarjetas-routes');
+const tarjetasDb = require('./tarjetas-database');
 
 const app = express();
 const PORT = 3000;
@@ -17,12 +18,41 @@ const FRONTEND_DIR = fs.existsSync(frontendLocal)
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(FRONTEND_DIR));
+
+// index.html se sirve con la versión de app.js y styles.css en la URL, para
+// que ni el navegador ni el proxy usen una versión vieja tras un despliegue.
+function versionDeArchivo(nombre) {
+  try {
+    return Math.floor(fs.statSync(path.join(FRONTEND_DIR, nombre)).mtimeMs).toString(36);
+  } catch (e) {
+    return '0';
+  }
+}
+
+app.get('/', (req, res) => {
+  try {
+    const html = fs.readFileSync(path.join(FRONTEND_DIR, 'index.html'), 'utf8');
+    res.set('Cache-Control', 'no-cache');
+    res.type('html').send(
+      html
+        .replace('href="styles.css"', `href="styles.css?v=${versionDeArchivo('styles.css')}"`)
+        .replace('src="app.js"', `src="app.js?v=${versionDeArchivo('app.js')}"`)
+    );
+  } catch (e) {
+    res.status(500).send('No se encontró index.html');
+  }
+});
+
+app.use(express.static(FRONTEND_DIR, { index: false }));
 
 app.use('/api/tarjetas', tarjetasRoutes);
 
 // Fecha y hora en la zona de la app, sin depender del TZ del contenedor
 // (Docker suele correr en UTC). Se puede cambiar con APP_TIMEZONE.
+function redondear(valor) {
+  return Math.round(valor * 100) / 100;
+}
+
 function ahoraLocal() {
   const tz = process.env.APP_TIMEZONE || 'America/Bogota';
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -122,6 +152,10 @@ function ejecutarMigraciones() {
     db.exec(`UPDATE cuentas SET incluir_en_total = 0 WHERE nombre = 'AHORROS' AND incluir_en_total = 1;`);
   } catch(e) {}
   try {
+    // Marca las salidas que en realidad son pagos de tarjeta: "tarjeta:<idPago>"
+    db.exec(`ALTER TABLE salidas ADD COLUMN origen TEXT DEFAULT '';`);
+  } catch(e) {}
+  try {
     db.exec(`CREATE TABLE IF NOT EXISTS grupos_cuentas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL UNIQUE,
@@ -201,8 +235,76 @@ app.post('/api/salidas', (req, res) => {
 });
 
 app.delete('/api/salidas/:id', (req, res) => {
-  db.prepare('DELETE FROM salidas WHERE id = ?').run(parseInt(req.params.id));
+  const id = parseInt(req.params.id);
+  const salida = db.prepare('SELECT * FROM salidas WHERE id = ?').get(id);
+
+  // Si el gasto era un pago de tarjeta, se deshace también en la tarjeta.
+  if (salida && salida.origen && salida.origen.indexOf('tarjeta:') === 0) {
+    const pagoId = parseInt(salida.origen.split(':')[1], 10);
+    const pago = tarjetasDb.prepare('SELECT * FROM pagos WHERE id = ?').get(pagoId);
+    if (pago) {
+      const tarjeta = tarjetasDb.prepare('SELECT * FROM tarjetas WHERE id = ?').get(pago.tarjeta_id);
+      tarjetasDb.transaction(() => {
+        tarjetasDb.prepare('DELETE FROM pagos WHERE id = ?').run(pago.id);
+        if (tarjeta) {
+          tarjetasDb.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+            .run(redondear(tarjeta.deuda_actual + pago.monto), tarjeta.id);
+        }
+      })();
+    }
+  }
+
+  db.prepare('DELETE FROM salidas WHERE id = ?').run(id);
   res.json({ success: true });
+});
+
+// ========== PAGO DE TARJETA DESDE UNA CUENTA ==========
+app.post('/api/pagotarjeta', (req, res) => {
+  const { tarjetaId, cuenta, monto, descripcion } = req.body;
+  if (!tarjetaId || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
+
+  const montoNum = parseFloat(monto);
+  if (!Number.isFinite(montoNum) || montoNum <= 0) {
+    return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+  }
+  const pago = redondear(montoNum);
+
+  const tarjeta = tarjetasDb.prepare('SELECT * FROM tarjetas WHERE id = ?').get(parseInt(tarjetaId));
+  if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
+  if (pago > tarjeta.deuda_actual) {
+    return res.json({ success: false, message: `El pago no puede superar la deuda (${tarjeta.deuda_actual})` });
+  }
+
+  const local = ahoraLocal();
+  const fecha = req.body.fecha || local.fecha;
+  const hora = req.body.hora || local.hora;
+  const desc = descripcion && String(descripcion).trim()
+    ? String(descripcion).trim()
+    : `Pago tarjeta ${tarjeta.nombre}`;
+
+  let pagoId = null;
+  try {
+    const cobrar = tarjetasDb.transaction(() => {
+      const info = tarjetasDb.prepare('INSERT INTO pagos (tarjeta_id, monto, tipo, fecha, nota) VALUES (?, ?, ?, ?, ?)')
+        .run(tarjeta.id, pago, 'PAGO_TARJETA', fecha, `Desde ${cuenta}`);
+      tarjetasDb.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+        .run(redondear(tarjeta.deuda_actual - pago), tarjeta.id);
+      return info.lastInsertRowid;
+    });
+    pagoId = cobrar();
+
+    db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta, created_at, origen) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(`${fecha} ${hora}`, desc, pago, cuenta, Math.floor(Date.now() / 1000), `tarjeta:${pagoId}`);
+  } catch (e) {
+    if (pagoId !== null) {
+      tarjetasDb.prepare('DELETE FROM pagos WHERE id = ?').run(pagoId);
+      tarjetasDb.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+        .run(tarjeta.deuda_actual, tarjeta.id);
+    }
+    return res.json({ success: false, message: 'No se pudo registrar el pago' });
+  }
+
+  res.json({ success: true, fecha, hora, deuda: redondear(tarjeta.deuda_actual - pago) });
 });
 
 // ========== MOVIMIENTOS ==========
@@ -237,7 +339,8 @@ app.get('/api/movimientos', (req, res) => {
       detalle: s.descripcion,
       cuenta: s.cuenta,
       id: s.id,
-      createdAt: s.created_at
+      createdAt: s.created_at,
+      origen: s.origen || ''
     }))
   ];
 
@@ -270,6 +373,31 @@ app.put('/api/movimientos/:tipo/:id', (req, res) => {
   if (!tabla) return res.json({ success: false, message: 'Tipo inválido' });
   if (!fecha || !hora || !descripcion || !cuenta || isNaN(parseFloat(monto))) {
     return res.json({ success: false, message: 'Faltan datos' });
+  }
+
+  // Si es un pago de tarjeta, se ajusta también el pago y la deuda de la tarjeta.
+  if (tabla === 'salidas') {
+    const salida = db.prepare('SELECT * FROM salidas WHERE id = ?').get(parseInt(id));
+    if (salida && salida.origen && salida.origen.indexOf('tarjeta:') === 0) {
+      const pagoId = parseInt(salida.origen.split(':')[1], 10);
+      const pago = tarjetasDb.prepare('SELECT * FROM pagos WHERE id = ?').get(pagoId);
+      if (pago) {
+        const tarjeta = tarjetasDb.prepare('SELECT * FROM tarjetas WHERE id = ?').get(pago.tarjeta_id);
+        if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
+
+        const nuevoMonto = redondear(parseFloat(monto));
+        const deudaAntesDelPago = redondear(tarjeta.deuda_actual + pago.monto);
+        if (nuevoMonto > deudaAntesDelPago) {
+          return res.json({ success: false, message: `El pago no puede superar la deuda (${deudaAntesDelPago})` });
+        }
+
+        tarjetasDb.transaction(() => {
+          tarjetasDb.prepare('UPDATE pagos SET monto = ? WHERE id = ?').run(nuevoMonto, pago.id);
+          tarjetasDb.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+            .run(redondear(deudaAntesDelPago - nuevoMonto), tarjeta.id);
+        })();
+      }
+    }
   }
 
   // No se toca created_at: se usa para ordenar la lista y editar un movimiento

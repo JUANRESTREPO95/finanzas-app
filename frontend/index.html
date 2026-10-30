@@ -354,6 +354,7 @@
         <button class="tipo-btn active" data-tipo="INGRESO">Ingreso</button>
         <button class="tipo-btn" data-tipo="SALIDA">Gasto</button>
         <button class="tipo-btn" data-tipo="TRANSFERENCIA">Mover</button>
+        <button class="tipo-btn" data-tipo="TARJETA">Tarjeta</button>
       </div>
 
       <input type="hidden" id="transaccionEditId">
@@ -381,6 +382,12 @@
       <div class="form-group">
         <label>Descripción</label>
         <input type="text" id="transaccionDescripcion" placeholder="Ej: Compra supermercado">
+      </div>
+
+      <div class="form-group" id="rowTarjeta" style="display:none;">
+        <label>Tarjeta</label>
+        <select id="transaccionTarjeta"></select>
+        <p class="modal-hint" id="tarjetaDeudaHint"></p>
       </div>
 
       <div class="form-row" id="rowOrigenDestino">

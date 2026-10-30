@@ -325,7 +325,8 @@ function renderMovimientosHTML(movimientos, limitar = false, soloLectura = false
 
     const tipoClass = mov.tipo === 'INGRESO' ? 'ingreso' : 'salida';
     const signo = mov.tipo === 'INGRESO' ? '+' : '−';
-    const icono = mov.tipo === 'INGRESO' ? '↓' : '↑';
+    const esPagoTarjeta = mov.origen && mov.origen.indexOf('tarjeta:') === 0;
+    const icono = esPagoTarjeta ? '💳' : (mov.tipo === 'INGRESO' ? '↓' : '↑');
     const clickAttr = soloLectura ? '' : `onclick="editarMovimiento('${mov.tipo}', ${mov.id})"`;
     html += `
       <div class="movimiento-row" ${clickAttr}>
@@ -509,6 +510,7 @@ function inicializarModalTransaccion() {
 
   $('btnGuardarTransaccion').addEventListener('click', guardarTransaccion);
   $('btnCerrarTransaccion').addEventListener('click', () => cerrarModal('modalTransaccion'));
+  $('transaccionTarjeta').addEventListener('change', actualizarHintTarjeta);
 }
 
 function setTipoTransaccion(tipo) {
@@ -522,29 +524,54 @@ function setTipoTransaccion(tipo) {
   if (tipo === 'TRANSFERENCIA') {
     $('rowOrigenDestino').style.display = 'flex';
     $('rowCuenta').style.display = 'none';
+    $('rowTarjeta').style.display = 'none';
+  } else if (tipo === 'TARJETA') {
+    $('rowOrigenDestino').style.display = 'none';
+    $('rowCuenta').style.display = 'block';
+    $('rowTarjeta').style.display = 'block';
   } else {
     $('rowOrigenDestino').style.display = 'none';
     $('rowCuenta').style.display = 'block';
+    $('rowTarjeta').style.display = 'none';
   }
 
-  if (tipo === 'INGRESO') {
+  if (tipo === 'TRANSFERENCIA') {
     $('btnGuardarTransaccion').className = 'btn-giant';
-    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #10b981, #059669)';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+  } else if (tipo === 'TARJETA') {
+    $('btnGuardarTransaccion').className = 'btn-giant';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #0ea5e9, #2563eb)';
   } else if (tipo === 'SALIDA') {
     $('btnGuardarTransaccion').className = 'btn-giant';
     $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
   } else {
     $('btnGuardarTransaccion').className = 'btn-giant';
-    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+    $('btnGuardarTransaccion').style.background = 'linear-gradient(135deg, #10b981, #059669)';
+  }
+
+  $('transaccionDescripcion').placeholder = tipo === 'TARJETA'
+    ? 'Opcional (se usará «Pago tarjeta …»)'
+    : 'Ej: Compra supermercado';
+
+  if (tipo === 'TARJETA') {
+    cargarTarjetasParaPago();
+  }
+
+  if (!$('transaccionEditId').value) {
+    $('btnGuardarTransaccion').textContent = tipo === 'TARJETA' ? 'Pagar' : 'Guardar';
+    setTituloModalTransaccion(tipo, false);
   }
 }
 
 function setTituloModalTransaccion(tipo, datos) {
-  if (datos) {
-    $('modalTransaccionTitulo').textContent = tipo === 'INGRESO' ? 'Editar ingreso' : tipo === 'SALIDA' ? 'Editar gasto' : 'Editar transferencia';
-  } else {
-    $('modalTransaccionTitulo').textContent = tipo === 'INGRESO' ? 'Nuevo ingreso' : tipo === 'SALIDA' ? 'Nuevo gasto' : 'Mover dinero';
-  }
+  const titulos = {
+    INGRESO: ['Nuevo ingreso', 'Editar ingreso'],
+    SALIDA: ['Nuevo gasto', 'Editar gasto'],
+    TRANSFERENCIA: ['Mover dinero', 'Editar transferencia'],
+    TARJETA: ['Pagar tarjeta', 'Editar pago de tarjeta']
+  };
+  const par = titulos[tipo] || titulos.SALIDA;
+  $('modalTransaccionTitulo').textContent = datos ? par[1] : par[0];
 }
 
 function abrirTransaccion(tipo, datos = null) {
@@ -561,6 +588,11 @@ function abrirTransaccion(tipo, datos = null) {
   $('transaccionCuenta').innerHTML = opts;
   $('transaccionCuentaOrigen').innerHTML = opts;
   $('transaccionCuentaDestino').innerHTML = opts;
+
+  if (tipo !== 'TARJETA') {
+    $('transaccionTarjeta').innerHTML = '';
+    $('tarjetaDeudaHint').textContent = '';
+  }
 
   if (datos) {
     $('transaccionEditId').value = datos.id;
@@ -579,7 +611,7 @@ function abrirTransaccion(tipo, datos = null) {
     $('btnEliminarTransaccion').style.display = 'block';
     setTituloModalTransaccion(tipo, true);
   } else {
-    $('btnGuardarTransaccion').textContent = 'Guardar';
+    $('btnGuardarTransaccion').textContent = tipo === 'TARJETA' ? 'Pagar' : 'Guardar';
     $('btnEliminarTransaccion').style.display = 'none';
     setTituloModalTransaccion(tipo, false);
   }
@@ -596,7 +628,7 @@ function guardarTransaccion() {
   const editId = $('transaccionEditId').value;
   const editTipo = $('transaccionEditTipo').value;
 
-  if (!fecha || !descripcion || monto <= 0) {
+  if (!fecha || monto <= 0 || (tipoTransaccion !== 'TARJETA' && !descripcion)) {
     mostrarToast('Completa todos los campos'); return;
   }
 
@@ -613,6 +645,27 @@ function guardarTransaccion() {
     })
     .then(r => r.json())
     .then(res => finalizarTransaccion(res, btn, textoOriginal));
+    return;
+  }
+
+  if (tipoTransaccion === 'TARJETA') {
+    const tarjetaId = parseInt($('transaccionTarjeta').value);
+    const cuenta = $('transaccionCuenta').value;
+
+    if (!tarjetaId) {
+      mostrarToast('Elige una tarjeta con deuda');
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+      return;
+    }
+
+    fetch(`${API}/api/pagotarjeta`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tarjetaId, cuenta, monto, fecha, hora, descripcion })
+    })
+    .then(r => r.json())
+    .then(res => finalizarTransaccion(res, btn, textoOriginal, 'Pago registrado ✅'));
     return;
   }
 
@@ -640,16 +693,51 @@ function guardarTransaccion() {
   }
 }
 
-function finalizarTransaccion(res, btn, textoOriginal) {
+function finalizarTransaccion(res, btn, textoOriginal, mensaje) {
   btn.disabled = false;
   btn.textContent = textoOriginal;
   if (res.success) {
     cerrarModal('modalTransaccion');
-    mostrarToast('Guardado ✅');
+    mostrarToast(mensaje || 'Guardado ✅');
     recargarTodo();
   } else {
     mostrarToast('Error: ' + res.message);
   }
+}
+
+// ===== PAGO DE TARJETA DESDE EL MODAL DE MOVIMIENTOS =====
+function cargarTarjetasParaPago() {
+  const sel = $('transaccionTarjeta');
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  $('tarjetaDeudaHint').textContent = '';
+
+  fetch(`${API}/api/tarjetas`).then(r => r.json()).then(tarjetas => {
+    const conDeuda = (tarjetas || []).filter(t => t.deuda_actual > 0);
+
+    if (!conDeuda.length) {
+      sel.innerHTML = '<option value="">No hay tarjetas con deuda</option>';
+      $('transaccionMonto').removeAttribute('max');
+      return;
+    }
+
+    sel.innerHTML = conDeuda.map(t =>
+      `<option value="${t.id}" data-deuda="${t.deuda_actual}">${escapeHtml(t.nombre)}</option>`
+    ).join('');
+
+    actualizarHintTarjeta();
+  }).catch(() => {
+    sel.innerHTML = '<option value="">Error al cargar</option>';
+  });
+}
+
+function actualizarHintTarjeta() {
+  const sel = $('transaccionTarjeta');
+  const opt = sel.options[sel.selectedIndex];
+  const deuda = opt ? parseFloat(opt.dataset.deuda || 0) : 0;
+
+  $('tarjetaDeudaHint').textContent = deuda > 0 ? `Deuda actual: ${formatMonto(deuda)}` : '';
+  if (deuda > 0) $('transaccionMonto').setAttribute('max', deuda);
+  else $('transaccionMonto').removeAttribute('max');
 }
 
 function editarMovimiento(tipo, id) {
