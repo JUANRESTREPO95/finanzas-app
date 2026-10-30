@@ -1,17 +1,42 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const db = require('./database');
 const tarjetasRoutes = require('./tarjetas-routes');
 
 const app = express();
 const PORT = 3000;
 
+// En Docker el frontend queda en backend/frontend; desde el código fuente está
+// en la raíz del proyecto. Se soportan ambos casos.
+const frontendLocal = path.join(__dirname, 'frontend');
+const FRONTEND_DIR = fs.existsSync(frontendLocal)
+  ? frontendLocal
+  : path.join(__dirname, '..', 'frontend');
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'frontend')));
+app.use(express.static(FRONTEND_DIR));
 
 app.use('/api/tarjetas', tarjetasRoutes);
+
+// Fecha y hora en la zona de la app, sin depender del TZ del contenedor
+// (Docker suele correr en UTC). Se puede cambiar con APP_TIMEZONE.
+function ahoraLocal() {
+  const tz = process.env.APP_TIMEZONE || 'America/Bogota';
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date()).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  return {
+    fecha: `${partes.year}-${partes.month}-${partes.day}`,
+    hora: `${partes.hour === '24' ? '00' : partes.hour}:${partes.minute}`
+  };
+}
 
 // ========== CUENTAS ==========
 app.get('/api/cuentas', (req, res) => {
@@ -146,13 +171,9 @@ app.delete('/api/grupos/:id', (req, res) => {
 app.post('/api/ingresos', (req, res) => {
   let { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
-  const ahora = new Date();
-  if (!fecha) {
-    fecha = ahora.toISOString().split('T')[0];
-  }
-  if (!hora) {
-    hora = ahora.toTimeString().slice(0,5);
-  }
+  const local = ahoraLocal();
+  if (!fecha) fecha = local.fecha;
+  if (!hora) hora = local.hora;
   const fechaHora = `${fecha} ${hora}`;
   const createdAt = Math.floor(Date.now() / 1000);
   db.prepare('INSERT INTO ingresos (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
@@ -165,27 +186,13 @@ app.delete('/api/ingresos/:id', (req, res) => {
   res.json({ success: true });
 });
 
-app.put('/api/movimientos/INGRESO/:id', (req, res) => {
-  const { id } = req.params;
-  const { fecha, hora, descripcion, monto, cuenta } = req.body;
-  const fechaHora = `${fecha} ${hora}`;
-  const createdAt = Math.floor(Date.now() / 1000);
-  db.prepare('UPDATE ingresos SET fecha_hora=?, descripcion=?, monto=?, cuenta=?, created_at=? WHERE id=?')
-    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt, parseInt(id));
-  res.json({ success: true });
-});
-
 // ========== SALIDAS ==========
 app.post('/api/salidas', (req, res) => {
   let { fecha, hora, descripcion, monto, cuenta } = req.body;
   if (!descripcion || !monto || !cuenta) return res.json({ success: false, message: 'Faltan datos' });
-  const ahora = new Date();
-  if (!fecha) {
-    fecha = ahora.toISOString().split('T')[0];
-  }
-  if (!hora) {
-    hora = ahora.toTimeString().slice(0,5);
-  }
+  const local = ahoraLocal();
+  if (!fecha) fecha = local.fecha;
+  if (!hora) hora = local.hora;
   const fechaHora = `${fecha} ${hora}`;
   const createdAt = Math.floor(Date.now() / 1000);
   db.prepare('INSERT INTO salidas (fecha_hora, descripcion, monto, cuenta, created_at) VALUES (?, ?, ?, ?, ?)')
@@ -195,16 +202,6 @@ app.post('/api/salidas', (req, res) => {
 
 app.delete('/api/salidas/:id', (req, res) => {
   db.prepare('DELETE FROM salidas WHERE id = ?').run(parseInt(req.params.id));
-  res.json({ success: true });
-});
-
-app.put('/api/movimientos/SALIDA/:id', (req, res) => {
-  const { id } = req.params;
-  const { fecha, hora, descripcion, monto, cuenta } = req.body;
-  const fechaHora = `${fecha} ${hora}`;
-  const createdAt = Math.floor(Date.now() / 1000);
-  db.prepare('UPDATE salidas SET fecha_hora=?, descripcion=?, monto=?, cuenta=?, created_at=? WHERE id=?')
-    .run(fechaHora, descripcion, parseFloat(monto), cuenta, createdAt, parseInt(id));
   res.json({ success: true });
 });
 
@@ -264,35 +261,30 @@ app.get('/api/resumen/mes-actual', (req, res) => {
   res.json({ anio, mes, ingresos: totalIngresos, salidas: totalSalidas });
 });
 
-// ========== ELIMINAR MOVIMIENTO ==========
-app.delete('/api/movimientos/:tipo/:id', (req, res) => {
-  const { tipo, id } = req.params;
-  const tabla = tipo === 'INGRESO' ? 'ingresos' : 'salidas';
-  db.prepare(`DELETE FROM ${tabla} WHERE id = ?`).run(parseInt(id));
-  res.json({ success: true });
-});
-
 // ========== EDITAR MOVIMIENTO ==========
 app.put('/api/movimientos/:tipo/:id', (req, res) => {
   const { tipo, id } = req.params;
   const { fecha, hora, descripcion, monto, cuenta } = req.body;
-  const fechaHora = `${fecha} ${hora}`;
 
-  if (tipo === 'INGRESO') {
-    db.prepare('UPDATE ingresos SET fecha_hora=?, descripcion=?, monto=?, cuenta=? WHERE id=?')
-      .run(fechaHora, descripcion, parseFloat(monto), cuenta, parseInt(id));
-  } else {
-    db.prepare('UPDATE salidas SET fecha_hora=?, descripcion=?, monto=?, cuenta=? WHERE id=?')
-      .run(fechaHora, descripcion, parseFloat(monto), cuenta, parseInt(id));
+  const tabla = tipo === 'INGRESO' ? 'ingresos' : tipo === 'SALIDA' ? 'salidas' : null;
+  if (!tabla) return res.json({ success: false, message: 'Tipo inválido' });
+  if (!fecha || !hora || !descripcion || !cuenta || isNaN(parseFloat(monto))) {
+    return res.json({ success: false, message: 'Faltan datos' });
   }
+
+  // No se toca created_at: se usa para ordenar la lista y editar un movimiento
+  // no debe cambiarlo de posición.
+  db.prepare(`UPDATE ${tabla} SET fecha_hora=?, descripcion=?, monto=?, cuenta=? WHERE id=?`)
+    .run(`${fecha} ${hora}`, descripcion, parseFloat(monto), cuenta, parseInt(id));
   res.json({ success: true });
 });
 
 // ========== TRANSFERENCIA ==========
 app.post('/api/transferencia', (req, res) => {
-  const { cuentaOrigen, cuentaDestino, monto, descripcion } = req.body;
+  const { cuentaOrigen, cuentaDestino, monto, descripcion, fecha, hora } = req.body;
   if (cuentaOrigen === cuentaDestino) return res.json({ success: false, message: 'Cuentas iguales' });
-  const fechaHora = new Date().toISOString();
+  const local = ahoraLocal();
+  const fechaHora = `${fecha || local.fecha} ${hora || local.hora}`;
   const createdAt = Math.floor(Date.now() / 1000);
   const desc = descripcion || 'Transferencia';
 

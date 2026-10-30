@@ -3,6 +3,7 @@ const API = '';
 let todosLosMovimientos = [];
 let todasLasCuentas = [];
 let todosLosPendientes = [];
+let pendientesGestion = [];   // /api/pendientes/all: incluye los ya pagados
 let filtroMovimientos = 'todos';
 let menuAbierto = false;
 let tipoTransaccion = 'INGRESO';
@@ -20,6 +21,12 @@ function escapeHtml(text) {
   return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
+// Literal de texto seguro para usar dentro de un onclick="f(...)". JSON.stringify
+// pone las comillas y escapa el contenido; escapeHtml evita romper el atributo.
+function jsString(valor) {
+  return escapeHtml(JSON.stringify(String(valor == null ? '' : valor)));
+}
+
 function fechaActual() {
   const ahora = new Date();
   return `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
@@ -28,6 +35,26 @@ function fechaActual() {
 function horaActual() {
   const ahora = new Date();
   return `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+}
+
+// Los movimientos usan "YYYY-MM-DD HH:MM". Las transferencias antiguas
+// quedaron guardadas en ISO ("...T...Z"), que está en UTC y hay que convertir.
+function fechaDe(fechaHora) {
+  if (!fechaHora) return fechaActual();
+  if (fechaHora.includes('T')) {
+    const d = new Date(fechaHora);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  return fechaHora.split(' ')[0];
+}
+
+function horaDe(fechaHora) {
+  if (!fechaHora) return '';
+  if (fechaHora.includes('T')) {
+    const d = new Date(fechaHora);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  return fechaHora.split(' ')[1] || '';
 }
 
 function mostrarToast(msg) {
@@ -54,7 +81,7 @@ function nombreMes(mesNum) {
 
 // ===== INICIALIZACIÓN =====
 window.onload = function() {
-  aplicarModoOscuroGuardado();
+  aplicarTema();
   inicializarNavegacion();
   inicializarFAB();
   inicializarModalTransaccion();
@@ -77,19 +104,53 @@ function cargarDatosIniciales() {
   });
 }
 
-function aplicarModoOscuroGuardado() {
-  if (localStorage.getItem('modoOscuro') === 'true') {
-    document.body.classList.add('dark');
-    $('btnModoOscuro')?.classList.add('active');
-    $('btnModoOscuro')?.querySelector('.config-toggle')?.classList.add('active');
-  }
+// ===== TEMA: claro / oscuro / automático (según el sistema) =====
+const TEMA_KEY = 'tema';
+const mqTemaOscuro = typeof window.matchMedia === 'function'
+  ? window.matchMedia('(prefers-color-scheme: dark)')
+  : null;
+
+function sistemaPrefiereOscuro() {
+  return !!(mqTemaOscuro && mqTemaOscuro.matches);
 }
 
-function toggleModoOscuro() {
-  const esOscuro = document.body.classList.toggle('dark');
-  localStorage.setItem('modoOscuro', esOscuro);
-  $('btnModoOscuro')?.classList.toggle('active', esOscuro);
-  $('btnModoOscuro')?.querySelector('.config-toggle')?.classList.toggle('active', esOscuro);
+function temaPreferido() {
+  const guardado = localStorage.getItem(TEMA_KEY);
+  if (guardado === 'claro' || guardado === 'oscuro' || guardado === 'auto') return guardado;
+
+  // Compatibilidad con la preferencia antigua (un solo interruptor).
+  const viejo = localStorage.getItem('modoOscuro');
+  if (viejo === 'true') return 'oscuro';
+  if (viejo === 'false') return 'claro';
+  return 'auto';
+}
+
+function aplicarTema() {
+  const preferido = temaPreferido();
+  const efectivo = preferido === 'auto'
+    ? (sistemaPrefiereOscuro() ? 'oscuro' : 'claro')
+    : preferido;
+
+  document.body.classList.toggle('dark', efectivo === 'oscuro');
+
+  document.querySelectorAll('.tema-btn').forEach(btn => {
+    const activo = btn.dataset.tema === preferido;
+    btn.classList.toggle('active', activo);
+    btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
+  });
+}
+
+function cambiarTema(tema) {
+  localStorage.setItem(TEMA_KEY, tema);
+  localStorage.removeItem('modoOscuro');
+  aplicarTema();
+}
+
+// Con el tema automático, seguir en vivo los cambios del sistema.
+if (mqTemaOscuro && mqTemaOscuro.addEventListener) {
+  mqTemaOscuro.addEventListener('change', () => {
+    if (temaPreferido() === 'auto') aplicarTema();
+  });
 }
 
 // ===== NAVEGACIÓN =====
@@ -140,10 +201,9 @@ function cargarCuentas() {
 function cargarDashboard() {
   Promise.all([
     fetch(`${API}/api/totales`).then(r => r.json()),
-    fetch(`${API}/api/totales/sin-ahorros`).then(r => r.json()),
     fetch(`${API}/api/movimientos?mes=${mesSelector.mes}&anio=${mesSelector.anio}`).then(r => r.json()),
     fetch(`${API}/api/resumen/mes-actual`).then(r => r.json())
-  ]).then(([totalesResp, totalDisp, movimientos, resumenMes]) => {
+  ]).then(([totalesResp, movimientos, resumenMes]) => {
     const totales = totalesResp.cuentas;
     const grupos = totalesResp.grupos || [];
 
@@ -165,8 +225,6 @@ function cargarDashboard() {
         gruposEl.innerHTML = '';
       }
     }
-
-    $('totalSinAhorros') && ($('totalSinAhorros').textContent = formatMonto(totalDisp.total));
 
     $('resumenIngresos').textContent = formatMonto(resumenMes.ingresos);
     $('resumenSalidas').textContent = formatMonto(resumenMes.salidas);
@@ -235,8 +293,8 @@ function renderMovimientosHTML(movimientos, limitar = false, soloLectura = false
   let ultimaFecha = '';
   const lista = limitar && movimientos.length > 10 ? movimientos.slice(0, 10) : movimientos;
 
-  lista.forEach((mov, idx) => {
-    const fecha = mov.fechaHora ? mov.fechaHora.split(' ')[0] : '';
+  lista.forEach(mov => {
+    const fecha = mov.fechaHora ? fechaDe(mov.fechaHora) : '';
     if (fecha && fecha !== ultimaFecha) {
       html += `<div class="fecha-divider">${formatearFecha(fecha)}</div>`;
       ultimaFecha = fecha;
@@ -245,13 +303,13 @@ function renderMovimientosHTML(movimientos, limitar = false, soloLectura = false
     const tipoClass = mov.tipo === 'INGRESO' ? 'ingreso' : 'salida';
     const signo = mov.tipo === 'INGRESO' ? '+' : '−';
     const icono = mov.tipo === 'INGRESO' ? '↓' : '↑';
-    const clickAttr = soloLectura ? '' : `onclick="editarMovimiento(${idx})"`;
+    const clickAttr = soloLectura ? '' : `onclick="editarMovimiento('${mov.tipo}', ${mov.id})"`;
     html += `
       <div class="movimiento-row" ${clickAttr}>
         <div class="movimiento-avatar ${tipoClass}">${icono}</div>
         <div class="movimiento-body">
           <div class="movimiento-title">${escapeHtml(mov.detalle)}</div>
-          <div class="movimiento-subtitle">${escapeHtml(mov.cuenta)} · ${mov.fechaHora?.split(' ')[1] || ''}</div>
+          <div class="movimiento-subtitle">${escapeHtml(mov.cuenta)} · ${horaDe(mov.fechaHora)}</div>
         </div>
         <div class="movimiento-amount ${tipoClass}">${signo}${mov.monto.toLocaleString('es-CO')}</div>
       </div>`;
@@ -271,7 +329,18 @@ function formatearFecha(fechaStr) {
   ayer.setDate(ayer.getDate() - 1);
   const ayerStr = `${ayer.getFullYear()}-${String(ayer.getMonth()+1).padStart(2,'0')}-${String(ayer.getDate()).padStart(2,'0')}`;
   if (fechaStr === ayerStr) return 'Ayer';
-  return new Date(fechaStr).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  // "YYYY-MM-DD" es una fecha local: new Date(str) la interpreta como UTC y
+  // en zonas UTC-5 mostraría el día anterior. Los datos viejos con "T" sí
+  // están en UTC y se convierten a hora local.
+  let fecha;
+  if (fechaStr.includes('T')) {
+    fecha = new Date(fechaStr);
+  } else {
+    const [anio, mes, dia] = fechaStr.split('-').map(Number);
+    fecha = new Date(anio, mes - 1, dia);
+  }
+  return fecha.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 function inicializarSelectorMes() {
@@ -465,7 +534,7 @@ function abrirTransaccion(tipo, datos = null) {
   $('transaccionHora').value = horaActual();
 
   // Llenar selects
-  const opts = todasLasCuentas.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  const opts = todasLasCuentas.map(c => `<option value="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
   $('transaccionCuenta').innerHTML = opts;
   $('transaccionCuentaOrigen').innerHTML = opts;
   $('transaccionCuentaDestino').innerHTML = opts;
@@ -475,8 +544,8 @@ function abrirTransaccion(tipo, datos = null) {
     $('transaccionEditTipo').value = datos.tipo;
     $('transaccionMonto').value = datos.monto;
     $('transaccionDescripcion').value = datos.detalle;
-    $('transaccionFecha').value = datos.fechaHora.split(' ')[0];
-    $('transaccionHora').value = datos.fechaHora.split(' ')[1] || horaActual();
+    $('transaccionFecha').value = fechaDe(datos.fechaHora);
+    $('transaccionHora').value = horaDe(datos.fechaHora) || horaActual();
     if (tipo === 'TRANSFERENCIA') {
       $('transaccionCuentaOrigen').value = datos.cuentaOrigen;
       $('transaccionCuentaDestino').value = datos.cuentaDestino;
@@ -532,7 +601,7 @@ function guardarTransaccion() {
     fetch(`${API}/api/transferencia`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ cuentaOrigen: origen, cuentaDestino: destino, monto, descripcion })
+      body: JSON.stringify({ cuentaOrigen: origen, cuentaDestino: destino, monto, descripcion, fecha, hora })
     })
     .then(r => r.json())
     .then(res => finalizarTransaccion(res, btn, textoOriginal));
@@ -560,8 +629,10 @@ function finalizarTransaccion(res, btn, textoOriginal) {
   }
 }
 
-function editarMovimiento(index) {
-  const mov = todosLosMovimientos[index];
+function editarMovimiento(tipo, id) {
+  // La lista visible puede estar filtrada, así que se busca por tipo + id
+  // (los ingresos y las salidas tienen ids independientes) y no por posición.
+  const mov = todosLosMovimientos.find(m => m.tipo === tipo && m.id === id);
   if (!mov) return;
   abrirTransaccion(mov.tipo, mov);
 }
@@ -598,8 +669,9 @@ function inicializarModales() {
   });
   $('btnCerrarConfig').addEventListener('click', () => cerrarModal('modalConfig'));
 
-  $('btnModoOscuro').addEventListener('click', toggleModoOscuro);
-  $('btnModoOscuroTarjetas').addEventListener('click', toggleModoOscuro);
+  document.querySelectorAll('.tema-btn').forEach(btn => {
+    btn.addEventListener('click', () => cambiarTema(btn.dataset.tema));
+  });
 
   // Botón de cambio de módulo junto a Config
   $('btnCambiarModulo').addEventListener('click', () => {
@@ -700,6 +772,9 @@ function recargarTodo() {
 }
 
 function refrescoAutomatico() {
+  // Solo refrescar mientras el módulo de finanzas está visible
+  if (appActiva !== 'finanzas') return;
+
   // No refrescar si hay algún modal con input activo para evitar cortar al usuario
   const modalesActivos = document.querySelectorAll('.modal.active');
   const hayModalConFormulario = Array.from(modalesActivos).some(m => {
@@ -744,10 +819,10 @@ function cargarListaCuentas() {
     $('listaCuentas').innerHTML = cuentas.map(c => `
       <div class="cuenta-config-row">
         <label>
-          <input type="checkbox" ${c.incluir_en_total ? 'checked' : ''} onchange="toggleCuentaVisible('${c.nombre}', this.checked)">
-          <span>${c.nombre}</span>
+          <input type="checkbox" ${c.incluir_en_total ? 'checked' : ''} onchange="toggleCuentaVisible(${jsString(c.nombre)}, this.checked)">
+          <span>${escapeHtml(c.nombre)}</span>
         </label>
-        <button class="btn-delete" onclick="eliminarCuenta('${c.nombre}')">Eliminar</button>
+        <button class="btn-delete" onclick="eliminarCuenta(${jsString(c.nombre)})">Eliminar</button>
       </div>
     `).join('');
   });
@@ -776,10 +851,7 @@ function eliminarCuenta(nombre) {
 
 // ===== GRUPOS DE CUENTAS =====
 function cargarListaGrupos() {
-  Promise.all([
-    fetch(`${API}/api/grupos`).then(r => r.json()),
-    fetch(`${API}/api/cuentas`).then(r => r.json())
-  ]).then(([grupos, cuentas]) => {
+  fetch(`${API}/api/grupos`).then(r => r.json()).then(grupos => {
     const container = $('listaGrupos');
     if (!container) return;
 
@@ -793,17 +865,13 @@ function cargarListaGrupos() {
         <div class="grupo-config-header">
           <span>${escapeHtml(g.nombre)}</span>
           <div class="grupo-config-actions">
-            <button class="btn-icon small" onclick="editarGrupo(${g.id}, '${escapeHtml(g.nombre)}', ${JSON.stringify(g.cuentas).replace(/"/g,'&quot;')})">✎</button>
+            <button class="btn-icon small" onclick="editarGrupo(${g.id}, ${jsString(g.nombre)}, ${escapeHtml(JSON.stringify(g.cuentas))})">✎</button>
             <button class="btn-icon small" onclick="eliminarGrupo(${g.id})">🗑</button>
           </div>
         </div>
         <div class="grupo-config-cuentas">${g.cuentas.map(c => `<span class="chip-cuenta">${escapeHtml(c)}</span>`).join('')}</div>
       </div>
     `).join('');
-
-    // Actualizar opciones del form
-    const opts = cuentas.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-    $('grupoCuentasSelect').innerHTML = opts;
   });
 }
 
@@ -816,8 +884,8 @@ function mostrarFormGrupo(id = null, nombre = '', cuentasSeleccionadas = []) {
     const container = $('grupoCuentasCheckboxes');
     container.innerHTML = cuentas.map(c => `
       <label class="checkbox-pill">
-        <input type="checkbox" value="${c.nombre}" ${cuentasSeleccionadas.includes(c.nombre) ? 'checked' : ''}>
-        <span>${c.nombre}</span>
+        <input type="checkbox" value="${escapeHtml(c.nombre)}" ${cuentasSeleccionadas.includes(c.nombre) ? 'checked' : ''}>
+        <span>${escapeHtml(c.nombre)}</span>
       </label>
     `).join('');
   });
@@ -879,10 +947,13 @@ function abrirModalGestionPendientes(autoNuevo = false) {
 
 function cargarGestionPendientes() {
   fetch(`${API}/api/pendientes/cats`).then(r => r.json()).then(cats => {
-    $('pendienteCategoria').innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    $('pendienteCategoria').innerHTML =
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+      + '<option value="">Sin categoría</option>';
   });
 
   fetch(`${API}/api/pendientes/all`).then(r => r.json()).then(pendientes => {
+    pendientesGestion = pendientes;
     const grupos = {};
     pendientes.forEach(p => {
       const cat = p.categoria || 'Sin categoría';
@@ -901,7 +972,7 @@ function cargarGestionPendientes() {
         <div class="gestion-categoria">
           <div class="gestion-categoria-header">
             <span>${escapeHtml(cat)}</span>
-            <button onclick="eliminarCategoriaPendiente('${cat}')">Eliminar</button>
+            <button onclick="eliminarCategoriaPendiente(${jsString(cat)})">Eliminar</button>
           </div>
           ${grupos[cat].map(p => `
             <div class="gestion-pendiente-row">
@@ -934,13 +1005,16 @@ function mostrarFormPendiente() {
 }
 
 function editarPendiente(id) {
-  const p = todosLosPendientes.find(x => x.id === id);
+  // El listado de gestión viene de /api/pendientes/all (incluye pagados);
+  // todosLosPendientes solo trae los que faltan por pagar.
+  const p = pendientesGestion.find(x => x.id === id)
+         || todosLosPendientes.find(x => x.id === id);
   if (!p) return;
   $('pendienteEditId').value = p.id;
   $('pendienteDesc').value = p.descripcion;
   $('pendienteMonto').value = p.montoMensual;
   $('pendienteFecha').value = p.fecha;
-  $('pendienteCategoria').value = p.categoria;
+  $('pendienteCategoria').value = p.categoria || '';
   $('nuevaCategoriaP').value = '';
   $('inputNuevaCategoriaP').style.display = 'none';
   $('formPendiente').classList.add('active');
@@ -1042,6 +1116,7 @@ let appActiva = 'finanzas';
 let tarjetasCache = [];
 let tarjetaDetalleId = null;
 let simulacionTemp = null;
+let comprasActuales = [];
 
 function inicializarAppTarjetas() {
   // Selector del top-bar
@@ -1123,12 +1198,10 @@ function cambiarApp(app) {
   if (app === 'finanzas') {
     $('app-finanzas').classList.add('active');
     $('app-tarjetas').classList.remove('active');
-    document.body.classList.remove('modulo-tarjetas');
     recargarTodo();
   } else {
     $('app-finanzas').classList.remove('active');
     $('app-tarjetas').classList.add('active');
-    document.body.classList.add('modulo-tarjetas');
     cargarTarjetasDashboard();
   }
 }
@@ -1331,15 +1404,27 @@ function eliminarTarjeta() {
 }
 
 // ===== COMPRAS =====
-function abrirModalCompra(tarjetaId) {
+function abrirModalCompra(tarjetaId, compra = null) {
   $('compraTarjetaId').value = tarjetaId;
-  $('compraNombre').value = '';
-  $('compraDescripcion').value = '';
-  $('compraMonto').value = '';
-  $('compraCuotas').value = '1';
-  $('compraUnaCuotaSinInteres').checked = false;
-  $('compraFecha').value = fechaActual();
+  $('compraEditId').value = compra ? compra.id : '';
+  $('modalCompraTitulo').textContent = compra ? 'Editar compra' : 'Nueva compra';
+  $('btnGuardarCompra').textContent = compra ? 'Actualizar' : 'Guardar';
+
+  $('compraNombre').value = compra ? compra.nombre : '';
+  $('compraDescripcion').value = compra ? (compra.descripcion || '') : '';
+  $('compraMonto').value = compra ? compra.monto : '';
+  $('compraCuotas').value = compra ? compra.cuotas : '1';
+  $('compraUnaCuotaSinInteres').checked = compra ? !!compra.sin_interes : false;
+  $('compraFecha').value = compra ? compra.fecha : fechaActual();
+
   abrirModal('modalCompra');
+}
+
+function editarCompra(id, e) {
+  if (e) e.stopPropagation();
+  const compra = comprasActuales.find(c => c.id === id);
+  if (!compra) return;
+  abrirModalCompra(compra.tarjeta_id, compra);
 }
 
 function guardarCompra() {
@@ -1358,9 +1443,14 @@ function guardarCompra() {
     sinInteres: $('compraUnaCuotaSinInteres').checked || numCuotas === 1
   };
 
-  apiTarjetasPOST('/compras', datos).then(res => {
+  const editId = $('compraEditId').value;
+  const guardar = editId
+    ? apiTarjetasPUT(`/compras/${editId}`, datos)
+    : apiTarjetasPOST('/compras', datos);
+
+  guardar.then(res => {
     if (res.success) {
-      mostrarToast('Compra agregada ✅');
+      mostrarToast(editId ? 'Compra actualizada ✅' : 'Compra agregada ✅');
       cerrarModal('modalCompra');
       cargarTarjetasDashboard();
       if (tarjetaDetalleId === tarjetaId) verTarjeta(tarjetaId);
@@ -1372,6 +1462,7 @@ function guardarCompra() {
 
 function renderizarCompras(compras, containerId) {
   const container = $(containerId);
+  if (containerId === 'tarjetaCompras') comprasActuales = compras || [];
   if (!compras || !compras.length) {
     container.innerHTML = '<div class="mensaje-vacio">No hay compras registradas</div>';
     return;
@@ -1392,7 +1483,8 @@ function renderizarCompras(compras, containerId) {
         </div>
         ${!esFinalizada ? `
           <div class="compra-card-actions">
-            <button class="btn-small" onclick="avanzarCompra(${c.id}, event)">Avanzar cuota</button>
+            <button class="btn-small" onclick="editarCompra(${c.id}, event)">Editar</button>
+            <button class="btn-small" onclick="avanzarCompra(${c.id}, event)">Pagar cuota</button>
             <button class="btn-small danger" onclick="eliminarCompra(${c.id}, event)">Eliminar</button>
           </div>
         ` : ''}
@@ -1403,9 +1495,25 @@ function renderizarCompras(compras, containerId) {
 
 function avanzarCompra(id, e) {
   if (e) e.stopPropagation();
-  apiTarjetasPOST(`/compras/${id}/avanzar`).then(() => {
-    mostrarToast('Cuota avanzada ✅');
+
+  const compra = comprasActuales.find(c => c.id === id);
+  if (!compra) return;
+
+  const cuota = compra.cuota_mensual != null
+    ? compra.cuota_mensual
+    : compra.monto / compra.cuotas;
+
+  const texto = `¿Registrar el pago de la cuota ${compra.cuota_actual}/${compra.cuotas} por ${formatMonto(cuota)}?\n\nLa deuda bajará por ese monto y quedará en el historial de pagos.`;
+  if (!confirm(texto)) return;
+
+  apiTarjetasPOST(`/compras/${id}/avanzar`).then(res => {
+    if (!res.success) {
+      mostrarToast('Error: ' + (res.message || 'desconocido'));
+      return;
+    }
+    mostrarToast(res.estado === 'FINALIZADA' ? 'Compra finalizada ✅' : 'Cuota pagada ✅');
     cargarTodasComprasActivas();
+    cargarTarjetasDashboard();
     if (tarjetaDetalleId) verTarjeta(tarjetaDetalleId);
   });
 }
@@ -1502,8 +1610,26 @@ function renderizarPagos(pagos, containerId) {
         <span class="pago-card-monto">${formatMonto(p.monto)}</span>
       </div>
       <div class="pago-card-meta">${p.fecha} · ${escapeHtml(p.nota || '')}</div>
+      <div class="pago-card-actions">
+        <button class="btn-small danger" onclick="eliminarPago(${p.id}, event)">Eliminar</button>
+      </div>
     </div>
   `).join('');
+}
+
+function eliminarPago(id, e) {
+  if (e) e.stopPropagation();
+  if (!confirm('¿Eliminar este pago? La deuda volverá a subir por ese monto.')) return;
+
+  apiTarjetasDELETE(`/pagos/${id}`).then(res => {
+    if (!res.success) {
+      mostrarToast('Error: ' + (res.message || 'desconocido'));
+      return;
+    }
+    mostrarToast('Pago eliminado ✅');
+    cargarTarjetasDashboard();
+    if (tarjetaDetalleId) verTarjeta(tarjetaDetalleId);
+  });
 }
 
 // ===== SIMULADOR =====
@@ -1582,7 +1708,11 @@ function cargarSimulaciones() {
 
 function finalizarSimulacion(id) {
   if (!confirm('¿Convertir esta simulación en una compra real?')) return;
-  apiTarjetasPOST(`/simulaciones/${id}/finalizar`).then(() => {
+  apiTarjetasPOST(`/simulaciones/${id}/finalizar`).then(res => {
+    if (!res.success) {
+      mostrarToast('Error: ' + (res.message || 'desconocido'));
+      return;
+    }
     mostrarToast('Simulación convertida en compra ✅');
     cargarSimulaciones();
     cargarTarjetasDashboard();
@@ -1616,6 +1746,5 @@ function refrescoAutomaticoTarjetas() {
   if ($('screen-tarjetas-simulador').classList.contains('active')) cargarSimulaciones();
 }
 
-// Inicializar el módulo de tarjetas junto con finanzas
-inicializarAppTarjetas();
-setInterval(refrescoAutomaticoTarjetas, 10000);
+// El módulo de tarjetas y el refresco automático se registran una sola vez
+// en window.onload (arriba). No duplicar aquí.

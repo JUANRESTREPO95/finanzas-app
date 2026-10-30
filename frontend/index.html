@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FINANZAS">
   <title>FINANZAS</title>
+  <link rel="icon" type="image/png" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
+  <link rel="apple-touch-icon" href="Gemini_Generated_Image_f55ffif55ffif55f.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -83,15 +85,17 @@
         <div class="screen-header">
           <h2>Movimientos</h2>
         </div>
-        <div class="selector-mes">
-          <button class="mes-arrow" id="mesPrev">‹</button>
-          <span class="mes-label" id="mesLabel">Julio 2026</span>
-          <button class="mes-arrow" id="mesNext">›</button>
-        </div>
-        <div class="filtros-movimientos">
-          <button class="chip active" data-filtro="todos">Todos</button>
-          <button class="chip" data-filtro="INGRESO">Ingresos</button>
-          <button class="chip" data-filtro="SALIDA">Gastos</button>
+        <div class="movimientos-rail">
+          <div class="selector-mes">
+            <button class="mes-arrow" id="mesPrev">‹</button>
+            <span class="mes-label" id="mesLabel">Julio 2026</span>
+            <button class="mes-arrow" id="mesNext">›</button>
+          </div>
+          <div class="filtros-movimientos">
+            <button class="chip active" data-filtro="todos">Todos</button>
+            <button class="chip" data-filtro="INGRESO">Ingresos</button>
+            <button class="chip" data-filtro="SALIDA">Gastos</button>
+          </div>
         </div>
         <div class="movimientos-lista" id="todosMovimientos"></div>
       </section>
@@ -422,11 +426,15 @@
       </div>
 
       <div class="config-list" id="configFinanzas">
-        <button class="config-row" id="btnModoOscuro">
-          <span class="config-icon">🌙</span>
-          <span class="config-text">Modo oscuro</span>
-          <span class="config-toggle"><span class="toggle-knob"></span></span>
-        </button>
+        <div class="config-row tema-row">
+          <span class="config-icon">🌗</span>
+          <span class="config-text">Tema</span>
+          <div class="tema-switch" role="group" aria-label="Tema">
+            <button type="button" class="tema-btn" data-tema="claro" title="Claro" aria-label="Claro">☀️</button>
+            <button type="button" class="tema-btn" data-tema="oscuro" title="Oscuro" aria-label="Oscuro">🌙</button>
+            <button type="button" class="tema-btn" data-tema="auto" title="Automático (según el sistema)" aria-label="Automático">🖥️</button>
+          </div>
+        </div>
 
         <button class="config-row" data-seccion="cuentas">
           <span class="config-icon">💳</span>
@@ -442,11 +450,15 @@
       </div>
       
       <div class="config-list" id="configTarjetas" style="display:none;">
-        <button class="config-row" id="btnModoOscuroTarjetas">
-          <span class="config-icon">🌙</span>
-          <span class="config-text">Modo oscuro</span>
-          <span class="config-toggle"><span class="toggle-knob"></span></span>
-        </button>
+        <div class="config-row tema-row">
+          <span class="config-icon">🌗</span>
+          <span class="config-text">Tema</span>
+          <div class="tema-switch" role="group" aria-label="Tema">
+            <button type="button" class="tema-btn" data-tema="claro" title="Claro" aria-label="Claro">☀️</button>
+            <button type="button" class="tema-btn" data-tema="oscuro" title="Oscuro" aria-label="Oscuro">🌙</button>
+            <button type="button" class="tema-btn" data-tema="auto" title="Automático (según el sistema)" aria-label="Automático">🖥️</button>
+          </div>
+        </div>
 
         <button class="config-row" data-seccion="configuracion-tarjetas">
           <span class="config-icon">💳</span>
@@ -653,10 +665,6 @@
           <label>Día de pago</label>
           <input type="number" id="tarjetaDiaPago" placeholder="1-31" min="1" max="31">
         </div>
-        <div class="form-group half">
-          <label>Día de pago</label>
-          <input type="number" id="tarjetaDiaPago" placeholder="1-31" min="1" max="31">
-        </div>
       </div>
 
       <div class="form-group">
@@ -675,11 +683,12 @@
     <div class="modal-card">
       <div class="modal-drag"></div>
       <div class="modal-header">
-        <h2>Nueva compra</h2>
+        <h2 id="modalCompraTitulo">Nueva compra</h2>
         <button class="modal-close" id="btnCerrarCompra">×</button>
       </div>
 
       <input type="hidden" id="compraTarjetaId">
+      <input type="hidden" id="compraEditId">
 
       <div class="form-group">
         <label>Nombre / concepto</label>
@@ -707,7 +716,7 @@
         <div class="form-group half" style="display:flex;align-items:flex-end;gap:8px;padding-bottom:8px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
             <input type="checkbox" id="compraUnaCuotaSinInteres" style="width:20px;height:20px;">
-            Pago a una cuota sin intereses
+            Sin intereses
           </label>
         </div>
       </div>

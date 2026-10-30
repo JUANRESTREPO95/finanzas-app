@@ -24,6 +24,8 @@
   --radius: 18px;
   --radius-lg: 28px;
   --radius-xl: 36px;
+
+  color-scheme: light;
 }
 
 body.dark {
@@ -46,6 +48,8 @@ body.dark {
   --shadow-sm: 0 2px 6px rgba(0,0,0,0.25);
   --shadow: 0 8px 24px rgba(0,0,0,0.35);
   --shadow-lg: 0 16px 40px rgba(0,0,0,0.45);
+
+  color-scheme: dark;
 }
 
 * {
@@ -1225,32 +1229,66 @@ body.dark .config-row {
   color: var(--text-muted);
 }
 
-.config-toggle {
-  width: 50px;
-  height: 28px;
-  border-radius: 14px;
-  background: var(--text-muted);
-  position: relative;
-  transition: background 0.2s;
+/* ===== SELECTOR DE TEMA ===== */
+.tema-row {
+  cursor: default;
 }
 
-.config-toggle.active {
-  background: var(--primary);
+.tema-row:active {
+  transform: none;
 }
 
-.toggle-knob {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: white;
-  transition: transform 0.2s;
+.tema-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid rgba(128, 128, 128, 0.12);
+  flex-shrink: 0;
 }
 
-.config-toggle.active .toggle-knob {
-  transform: translateX(22px);
+body.dark .tema-switch {
+  background: var(--surface);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.tema-btn {
+  width: 40px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.12s;
+}
+
+.tema-btn:hover {
+  background: var(--primary-light);
+}
+
+.tema-btn:active {
+  transform: scale(0.92);
+}
+
+.tema-btn.active {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+body.dark .tema-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.tema-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ===== LISTA CUENTAS CONFIG ===== */
@@ -1807,7 +1845,7 @@ body.dark .simulacion-card {
   margin-bottom: 6px;
 }
 
-.compra-card-actions, .simulacion-card-actions {
+.compra-card-actions, .pago-card-actions, .simulacion-card-actions {
   display: flex;
   gap: 8px;
   margin-top: 10px;
@@ -1865,8 +1903,236 @@ body.dark .simulacion-card {
   }
 }
 
+/* En navegadores modernos se usa el alto real de la ventana (barras del móvil). */
+@supports (height: 100dvh) {
+  .app,
+  .app-module { height: 100dvh; }
+}
+
+/* ===== TABLET ===== */
+.movimientos-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (min-width: 760px) {
+  .app { max-width: 820px; }
+
+  .screens { padding: 0 24px 72px; }
+
+  /* el carrusel pasa a cuadrícula: ya no hace falta deslizar */
+  .cuentas-carousel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    overflow: visible;
+    margin-right: 0;
+    padding-right: 4px;
+    scroll-snap-type: none;
+  }
+
+  .cuentas-carousel::after { display: none; }
+
+  .cuentas-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+  .pendientes-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .tarjetas-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .tarjetas-resumen-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .compras-lista,
+  .pagos-lista,
+  .simulaciones-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
+  }
+
+}
+
+/* ===== ESCRITORIO ===== */
+@media (min-width: 1024px) {
+  .app { max-width: 1240px; }
+
+  /* el módulo ocupa solo el alto que sobra tras la cabecera */
+  .app-module {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  .screens { padding: 0 28px 96px; }
+
+  /* la marca a la izquierda y los dos botones agrupados a la derecha,
+     para que la navegación no los tape */
+  .top-bar {
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .brand { margin-right: auto; }
+
+  /* navegación: de barra inferior a barra superior */
+  .bottom-nav {
+    position: absolute;
+    top: 8px;
+    right: 120px;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    width: max-content;
+    max-width: none;
+    padding: 4px;
+    gap: 2px;
+    border-radius: 999px;
+  }
+
+  .nav-item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+  }
+
+  .nav-label { font-size: 13px; }
+
+  /* botón flotante anclado a la app, no a la ventana */
+  .fab-main {
+    position: absolute;
+    bottom: 26px;
+    right: 28px;
+  }
+
+  .fab-menu {
+    position: absolute;
+    bottom: 96px;
+    right: 28px;
+  }
+
+  /* dashboard en dos columnas */
+  #screen-dashboard {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+  }
+
+  #screen-dashboard.active { display: grid; }
+
+  #screen-dashboard > .hero-balance { grid-column: 1 / -1; }
+
+  #screen-dashboard > :nth-child(2),
+  #screen-dashboard > :nth-child(3) { grid-column: 1; }
+
+  #screen-dashboard > :nth-child(4),
+  #screen-dashboard > :nth-child(5) { grid-column: 2; }
+
+  #screen-dashboard .cuentas-carousel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* movimientos: mes y filtros a la izquierda, lista a la derecha */
+  #screen-movimientos {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+  }
+
+  #screen-movimientos.active { display: grid; }
+
+  #screen-movimientos > .screen-header { grid-column: 1 / -1; }
+
+  #screen-movimientos > .movimientos-rail {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+
+  #screen-movimientos > #todosMovimientos {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  /* detalle de tarjeta: tarjeta a la izquierda, compras y pagos a la derecha */
+  #screen-tarjeta-detalle {
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+  }
+
+  #screen-tarjeta-detalle.active { display: grid; }
+
+  #screen-tarjeta-detalle > .screen-header {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    gap: 14px;
+  }
+
+  #screen-tarjeta-detalle > .tarjeta-big-card {
+    grid-column: 1;
+    grid-row: 2 / span 4;
+  }
+
+  #screen-tarjeta-detalle > :nth-child(3) { grid-column: 2; grid-row: 2; }
+  #screen-tarjeta-detalle > :nth-child(4) { grid-column: 2; grid-row: 3; }
+  #screen-tarjeta-detalle > :nth-child(5) { grid-column: 2; grid-row: 4; }
+  #screen-tarjeta-detalle > :nth-child(6) { grid-column: 2; grid-row: 5; }
+
+  /* simulador: formulario a la izquierda, guardadas a la derecha */
+  #screen-tarjetas-simulador {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+  }
+
+  #screen-tarjetas-simulador.active { display: grid; }
+
+  #screen-tarjetas-simulador > .screen-header { grid-column: 1 / -1; }
+
+  #screen-tarjetas-simulador > :nth-child(2),
+  #screen-tarjetas-simulador > :nth-child(3),
+  #screen-tarjetas-simulador > :nth-child(4),
+  #screen-tarjetas-simulador > :nth-child(5),
+  #screen-tarjetas-simulador > :nth-child(6) { grid-column: 1; }
+
+  #screen-tarjetas-simulador > :nth-child(7) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  #screen-tarjetas-simulador > :nth-child(8) {
+    grid-column: 2;
+    grid-row: 3 / span 4;
+  }
+
+  /* modales centrados y algo más anchos */
+  .modal { align-items: center; }
+
+  .modal-card { max-width: 560px; }
+
+  .modal-card-tall {
+    max-width: 680px;
+    max-height: calc(100vh - 120px);
+  }
+}
+
 @media (max-width: 360px) {
   .balance-amount { font-size: 32px; }
   .nav-label { display: none; }
   .bottom-nav { padding-bottom: 10px; }
+}
+
+/* Checkbox del formulario de compra */
+#compraUnaCuotaSinInteres {
+  accent-color: var(--primary);
+  cursor: pointer;
 }

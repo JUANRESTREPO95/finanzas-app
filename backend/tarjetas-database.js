@@ -8,6 +8,10 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'tarjetas.db');
 const db = new Database(DB_PATH);
 
+// SQLite trae las claves foráneas desactivadas por conexión: sin este pragma
+// los ON DELETE CASCADE de compras y pagos simplemente no se ejecutan.
+db.pragma('foreign_keys = ON');
+
 // db.pragma('journal_mode = WAL');
 
 function inicializar() {
@@ -81,6 +85,14 @@ function inicializar() {
   // Asegurar que compras antiguas de 1 cuota tengan cuota_mensual
   db.prepare(`UPDATE compras SET cuota_mensual = monto, total_intereses = 0 WHERE cuotas = 1 AND cuota_mensual IS NULL`).run();
   db.prepare(`UPDATE compras SET cuota_mensual = monto / cuotas, total_intereses = 0 WHERE sin_interes = 1 AND cuota_mensual IS NULL`).run();
+
+  // Corrige las compras "sin intereses" en varias cuotas que quedaron con la
+  // cuota completa en vez del monto repartido. Solo toca filas cuyo valor es
+  // exactamente el monto total, así que es seguro repetirlo en cada arranque.
+  db.prepare(`UPDATE compras SET cuota_mensual = monto / cuotas
+              WHERE sin_interes = 1 AND cuotas > 1
+                AND cuota_mensual IS NOT NULL
+                AND ABS(cuota_mensual - monto) < 0.01`).run();
 }
 
 inicializar();

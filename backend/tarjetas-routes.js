@@ -13,6 +13,24 @@ function ahoraHora() {
 }
 
 // ===== UTILIDADES FINANCIERAS =====
+// La deuda se guarda con 2 decimales para que sumar y restar no acumule error.
+function redondear(valor) {
+  return Math.round(valor * 100) / 100;
+}
+
+// Monto válido (> 0) redondeado a 2 decimales, o null si no sirve.
+function montoValido(valor) {
+  const n = parseFloat(valor);
+  return Number.isFinite(n) && n > 0 ? redondear(n) : null;
+}
+
+// Número de cuotas válido (entero >= 1). Si no viene, se asume 1.
+function cuotasValidas(valor) {
+  if (valor == null || valor === '') return 1;
+  const n = parseInt(valor, 10);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
 function calcularTasaAnual(tasaMensual) {
   return (Math.pow(1 + tasaMensual / 100, 12) - 1) * 100;
 }
@@ -42,7 +60,19 @@ router.post('/', (req, res) => {
     pagoMinimoPorcentaje, pagoMinimoMonto, diaCorte, diaPago, color
   } = req.body;
 
-  if (!nombre || !cupoTotal) return res.json({ success: false, message: 'Faltan datos' });
+  if (!nombre || !String(nombre).trim()) {
+    return res.json({ success: false, message: 'Falta el nombre de la tarjeta' });
+  }
+
+  const cupoNum = montoValido(cupoTotal);
+  if (cupoNum === null) {
+    return res.json({ success: false, message: 'El cupo total debe ser mayor que cero' });
+  }
+
+  const deudaNum = parseFloat(deudaActual || 0);
+  if (!Number.isFinite(deudaNum) || deudaNum < 0) {
+    return res.json({ success: false, message: 'La deuda no puede ser negativa' });
+  }
 
   let tm = parseFloat(tasaMensual || 0);
   let ta = parseFloat(tasaAnual || 0);
@@ -55,8 +85,8 @@ router.post('/', (req, res) => {
     (nombre, franquicia, cupo_total, deuda_actual, tasa_mensual, tasa_anual,
      pago_minimo_porcentaje, pago_minimo_monto, dia_corte, dia_pago, cuota_manejo, color)
     VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)`).run(
-    nombre.toUpperCase(), (franquicia || '').toUpperCase(), parseFloat(cupoTotal),
-    parseFloat(deudaActual || 0), tm, ta,
+    nombre.toUpperCase(), (franquicia || '').toUpperCase(), cupoNum,
+    redondear(deudaNum), tm, ta,
     diaCorte ? parseInt(diaCorte) : null,
     diaPago ? parseInt(diaPago) : null, cm, color || '#4361ee'
   );
@@ -71,6 +101,20 @@ router.put('/:id', (req, res) => {
     pagoMinimoPorcentaje, pagoMinimoMonto, diaCorte, diaPago, color
   } = req.body;
 
+  if (!nombre || !String(nombre).trim()) {
+    return res.json({ success: false, message: 'Falta el nombre de la tarjeta' });
+  }
+
+  const cupoNum = montoValido(cupoTotal);
+  if (cupoNum === null) {
+    return res.json({ success: false, message: 'El cupo total debe ser mayor que cero' });
+  }
+
+  const deudaNum = parseFloat(deudaActual || 0);
+  if (!Number.isFinite(deudaNum) || deudaNum < 0) {
+    return res.json({ success: false, message: 'La deuda no puede ser negativa' });
+  }
+
   let tm = parseFloat(tasaMensual || 0);
   let ta = parseFloat(tasaAnual || 0);
   if (tm && !ta) ta = calcularTasaAnual(tm);
@@ -82,8 +126,8 @@ router.put('/:id', (req, res) => {
     nombre=?, franquicia=?, cupo_total=?, deuda_actual=?, tasa_mensual=?, tasa_anual=?,
     pago_minimo_porcentaje=0, pago_minimo_monto=NULL, dia_corte=?, dia_pago=?, cuota_manejo=?, color=?
     WHERE id=?`).run(
-    nombre.toUpperCase(), (franquicia || '').toUpperCase(), parseFloat(cupoTotal),
-    parseFloat(deudaActual || 0), tm, ta,
+    nombre.toUpperCase(), (franquicia || '').toUpperCase(), cupoNum,
+    redondear(deudaNum), tm, ta,
     diaCorte ? parseInt(diaCorte) : null,
     diaPago ? parseInt(diaPago) : null, cm, color || '#4361ee', parseInt(id)
   );
@@ -92,7 +136,14 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM tarjetas WHERE id = ?').run(parseInt(req.params.id));
+  const id = parseInt(req.params.id);
+  // compras y pagos se van por ON DELETE CASCADE; simulaciones no tiene FK,
+  // así que se borran aquí para no dejar registros huérfanos.
+  const eliminarTarjeta = db.transaction((tarjetaId) => {
+    db.prepare('DELETE FROM simulaciones WHERE tarjeta_id = ?').run(tarjetaId);
+    db.prepare('DELETE FROM tarjetas WHERE id = ?').run(tarjetaId);
+  });
+  eliminarTarjeta(id);
   res.json({ success: true });
 });
 
@@ -157,53 +208,167 @@ router.get('/compras/:tarjeta_id', (req, res) => {
 
 router.post('/compras', (req, res) => {
   const { tarjetaId, nombre, descripcion, monto, cuotas, fecha, sinInteres } = req.body;
-  if (!tarjetaId || !nombre || !monto) return res.json({ success: false, message: 'Faltan datos' });
+
+  if (!tarjetaId || !nombre) {
+    return res.json({ success: false, message: 'Faltan datos' });
+  }
+
+  const montoNum = montoValido(monto);
+  if (montoNum === null) {
+    return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+  }
+
+  const numCuotas = cuotasValidas(cuotas);
+  if (numCuotas === null) {
+    return res.json({ success: false, message: 'Las cuotas deben ser un número entero mayor que cero' });
+  }
 
   const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(parseInt(tarjetaId));
-  const numCuotas = Math.max(1, parseInt(cuotas || 1));
-  const esSinInteres = sinInteres || numCuotas === 1;
-  let cuotaMensual = null;
-  let totalIntereses = null;
+  if (!tarjeta) {
+    return res.json({ success: false, message: 'Tarjeta no encontrada' });
+  }
 
-  if (tarjeta && !esSinInteres && numCuotas > 1) {
-    const resultado = calcularCuota(parseFloat(monto), tarjeta.tasa_mensual, numCuotas);
-    cuotaMensual = resultado.cuota;
-    totalIntereses = resultado.intereses;
-  } else if (!esSinInteres && numCuotas > 1) {
-    cuotaMensual = parseFloat(monto) / numCuotas;
+  const esSinInteres = !!sinInteres || numCuotas === 1;
+  let cuotaMensual;
+  let totalIntereses;
+
+  if (esSinInteres) {
+    // Sin intereses (o una sola cuota): el monto se reparte entre las cuotas.
+    cuotaMensual = montoNum / numCuotas;
     totalIntereses = 0;
   } else {
-    // 1 cuota o sin intereses: la cuota mensual es el monto total
-    cuotaMensual = parseFloat(monto);
-    totalIntereses = 0;
+    const resultado = calcularCuota(montoNum, tarjeta.tasa_mensual, numCuotas);
+    cuotaMensual = resultado.cuota;
+    totalIntereses = resultado.intereses;
   }
 
   const info = db.prepare(`INSERT INTO compras
     (tarjeta_id, nombre, descripcion, monto, cuotas, cuota_actual, cuota_mensual, total_intereses, sin_interes, fecha)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    parseInt(tarjetaId), nombre, descripcion || '', parseFloat(monto), numCuotas, 1,
+    parseInt(tarjetaId), nombre, descripcion || '', montoNum, numCuotas, 1,
     cuotaMensual, totalIntereses, esSinInteres ? 1 : 0, fecha || ahoraFecha()
   );
 
-  // Aumentar deuda de la tarjeta
+  // La deuda sube por el total a pagar (capital + intereses), no solo el capital.
+  const totalAPagar = Math.round(cuotaMensual * numCuotas * 100) / 100;
   if (tarjeta) {
     db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
-      .run(tarjeta.deuda_actual + parseFloat(monto), parseInt(tarjetaId));
+      .run(redondear(tarjeta.deuda_actual + totalAPagar), parseInt(tarjetaId));
   }
 
-  res.json({ success: true, id: info.lastInsertRowid, cuotaMensual, totalIntereses, sinInteres: esSinInteres });
+  res.json({ success: true, id: info.lastInsertRowid, cuotaMensual, totalIntereses, totalAPagar, sinInteres: esSinInteres });
+});
+
+router.put('/compras/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const compra = db.prepare('SELECT * FROM compras WHERE id = ?').get(id);
+  if (!compra) return res.json({ success: false, message: 'Compra no encontrada' });
+
+  const { nombre, descripcion, monto, cuotas, fecha, sinInteres } = req.body;
+
+  if (!nombre || !String(nombre).trim()) {
+    return res.json({ success: false, message: 'Falta el nombre de la compra' });
+  }
+
+  const montoNum = montoValido(monto);
+  if (montoNum === null) {
+    return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+  }
+
+  const numCuotas = cuotasValidas(cuotas);
+  if (numCuotas === null) {
+    return res.json({ success: false, message: 'Las cuotas deben ser un número entero mayor que cero' });
+  }
+
+  if (numCuotas < compra.cuota_actual) {
+    return res.json({
+      success: false,
+      message: `Las cuotas no pueden ser menores que la cuota actual (${compra.cuota_actual})`
+    });
+  }
+
+  const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(compra.tarjeta_id);
+  const esSinInteres = !!sinInteres || numCuotas === 1;
+
+  let cuotaMensual;
+  let totalIntereses;
+  if (esSinInteres) {
+    cuotaMensual = montoNum / numCuotas;
+    totalIntereses = 0;
+  } else if (tarjeta) {
+    const resultado = calcularCuota(montoNum, tarjeta.tasa_mensual, numCuotas);
+    cuotaMensual = resultado.cuota;
+    totalIntereses = resultado.intereses;
+  } else {
+    cuotaMensual = montoNum / numCuotas;
+    totalIntereses = 0;
+  }
+
+  const totalNuevo = redondear(cuotaMensual * numCuotas);
+  const totalViejo = compra.cuota_mensual != null
+    ? redondear(compra.cuota_mensual * compra.cuotas)
+    : compra.monto;
+
+  const editar = db.transaction(() => {
+    db.prepare(`UPDATE compras SET nombre=?, descripcion=?, monto=?, cuotas=?, cuota_mensual=?,
+                total_intereses=?, sin_interes=?, fecha=? WHERE id=?`).run(
+      nombre, descripcion || '', montoNum, numCuotas, cuotaMensual, totalIntereses,
+      esSinInteres ? 1 : 0, fecha || compra.fecha, id
+    );
+
+    // La deuda se ajusta por la diferencia entre el total anterior y el nuevo.
+    if (tarjeta && compra.estado !== 'FINALIZADA') {
+      db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+        .run(Math.max(0, redondear(tarjeta.deuda_actual - totalViejo + totalNuevo)), tarjeta.id);
+    }
+  });
+  editar();
+
+  res.json({ success: true, cuotaMensual, totalIntereses, totalAPagar: totalNuevo });
 });
 
 router.post('/compras/:id/avanzar', (req, res) => {
   const compra = db.prepare('SELECT * FROM compras WHERE id = ?').get(parseInt(req.params.id));
-  if (!compra) return res.json({ success: false, message: 'No encontrada' });
-  if (compra.cuota_actual >= compra.cuotas) {
-    db.prepare('UPDATE compras SET estado = ?, cuota_actual = ? WHERE id = ?')
-      .run('FINALIZADA', compra.cuotas, compra.id);
-  } else {
-    db.prepare('UPDATE compras SET cuota_actual = cuota_actual + 1 WHERE id = ?').run(compra.id);
+  if (!compra) return res.json({ success: false, message: 'Compra no encontrada' });
+  if (compra.estado === 'FINALIZADA') {
+    return res.json({ success: false, message: 'La compra ya está finalizada' });
   }
-  res.json({ success: true });
+
+  const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(compra.tarjeta_id);
+
+  const cuota = compra.cuota_mensual != null
+    ? redondear(compra.cuota_mensual)
+    : redondear(compra.monto / compra.cuotas);
+
+  // No se descuenta más de lo que se debe (por si ya pagaste a mano).
+  const aplicable = tarjeta ? Math.min(cuota, tarjeta.deuda_actual) : 0;
+
+  const esUltima = compra.cuota_actual >= compra.cuotas;
+  const nuevaCuotaActual = esUltima ? compra.cuotas : compra.cuota_actual + 1;
+  const estadoNuevo = esUltima ? 'FINALIZADA' : 'ACTIVA';
+
+  const avanzar = db.transaction(() => {
+    db.prepare('UPDATE compras SET cuota_actual = ?, estado = ? WHERE id = ?')
+      .run(nuevaCuotaActual, estadoNuevo, compra.id);
+
+    if (tarjeta && aplicable > 0) {
+      db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+        .run(redondear(tarjeta.deuda_actual - aplicable), tarjeta.id);
+
+      // Queda registrado como pago para que se vea y se pueda deshacer.
+      db.prepare('INSERT INTO pagos (tarjeta_id, monto, tipo, fecha, nota) VALUES (?, ?, ?, ?, ?)')
+        .run(tarjeta.id, aplicable, 'CUOTA', ahoraFecha(),
+             `Cuota ${compra.cuota_actual}/${compra.cuotas} - ${compra.nombre}`);
+    }
+  });
+  avanzar();
+
+  res.json({
+    success: true,
+    cuotaActual: nuevaCuotaActual,
+    estado: estadoNuevo,
+    pagado: aplicable
+  });
 });
 
 router.delete('/compras/:id', (req, res) => {
@@ -211,8 +376,12 @@ router.delete('/compras/:id', (req, res) => {
   if (compra && compra.estado !== 'FINALIZADA') {
     const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(compra.tarjeta_id);
     if (tarjeta) {
+      // Se descuenta lo mismo que se sumó al crearla: el total con intereses.
+      const total = compra.cuota_mensual != null
+        ? redondear(compra.cuota_mensual * compra.cuotas)
+        : compra.monto;
       db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
-        .run(Math.max(0, tarjeta.deuda_actual - compra.monto), tarjeta.id);
+        .run(Math.max(0, redondear(tarjeta.deuda_actual - total)), tarjeta.id);
     }
   }
   db.prepare('DELETE FROM compras WHERE id = ?').run(parseInt(req.params.id));
@@ -227,18 +396,53 @@ router.get('/pagos/:tarjeta_id', (req, res) => {
 
 router.post('/pagos', (req, res) => {
   const { tarjetaId, monto, tipo, fecha, nota } = req.body;
-  if (!tarjetaId || !monto) return res.json({ success: false, message: 'Faltan datos' });
+  if (!tarjetaId) return res.json({ success: false, message: 'Faltan datos' });
 
   const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(parseInt(tarjetaId));
   if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
 
+  const montoNum = parseFloat(monto);
+  if (!Number.isFinite(montoNum) || montoNum <= 0) {
+    return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+  }
+
+  const pago = redondear(montoNum);
+  if (pago > tarjeta.deuda_actual) {
+    return res.json({
+      success: false,
+      message: `El pago no puede superar la deuda actual (${tarjeta.deuda_actual})`
+    });
+  }
+
   db.prepare('INSERT INTO pagos (tarjeta_id, monto, tipo, fecha, nota) VALUES (?, ?, ?, ?, ?)')
-    .run(parseInt(tarjetaId), parseFloat(monto), tipo || 'OTRO', fecha || ahoraFecha(), nota || '');
+    .run(parseInt(tarjetaId), pago, tipo || 'OTRO', fecha || ahoraFecha(), nota || '');
 
   db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
-    .run(Math.max(0, tarjeta.deuda_actual - parseFloat(monto)), tarjeta.id);
+    .run(redondear(tarjeta.deuda_actual - pago), tarjeta.id);
 
-  res.json({ success: true });
+  res.json({ success: true, deuda: redondear(tarjeta.deuda_actual - pago) });
+});
+
+router.delete('/pagos/:id', (req, res) => {
+  const pago = db.prepare('SELECT * FROM pagos WHERE id = ?').get(parseInt(req.params.id));
+  if (!pago) return res.json({ success: false, message: 'Pago no encontrado' });
+
+  const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(pago.tarjeta_id);
+
+  const borrar = db.transaction(() => {
+    db.prepare('DELETE FROM pagos WHERE id = ?').run(pago.id);
+    // Al deshacer el pago, la deuda vuelve a subir por ese monto.
+    if (tarjeta) {
+      db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+        .run(redondear(tarjeta.deuda_actual + pago.monto), tarjeta.id);
+    }
+  });
+  borrar();
+
+  res.json({
+    success: true,
+    deuda: tarjeta ? redondear(tarjeta.deuda_actual + pago.monto) : null
+  });
 });
 
 // ===== SIMULACIONES =====
@@ -249,19 +453,25 @@ router.get('/simulaciones', (req, res) => {
 
 router.post('/simular', (req, res) => {
   const { tarjetaId, monto, cuotas } = req.body;
-  if (!tarjetaId || !monto || !cuotas) return res.json({ success: false, message: 'Faltan datos' });
+  if (!tarjetaId) return res.json({ success: false, message: 'Faltan datos' });
+
+  const montoNum = montoValido(monto);
+  if (montoNum === null) return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+
+  const numCuotas = cuotasValidas(cuotas);
+  if (numCuotas === null) return res.json({ success: false, message: 'Las cuotas deben ser un número entero mayor que cero' });
 
   const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(parseInt(tarjetaId));
   if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
 
-  const resultado = calcularCuota(parseFloat(monto), tarjeta.tasa_mensual, parseInt(cuotas));
+  const resultado = calcularCuota(montoNum, tarjeta.tasa_mensual, numCuotas);
   res.json({
     success: true,
     tarjetaNombre: tarjeta.nombre,
     tasaMensual: tarjeta.tasa_mensual,
     tasaAnual: tarjeta.tasa_anual,
-    monto: parseFloat(monto),
-    cuotas: parseInt(cuotas),
+    monto: montoNum,
+    cuotas: numCuotas,
     cuotaMensual: resultado.cuota,
     totalPagado: resultado.total,
     totalIntereses: resultado.intereses
@@ -270,16 +480,22 @@ router.post('/simular', (req, res) => {
 
 router.post('/simulaciones', (req, res) => {
   const { nombre, tarjetaId, monto, cuotas } = req.body;
-  if (!nombre || !tarjetaId || !monto || !cuotas) return res.json({ success: false, message: 'Faltan datos' });
+  if (!nombre || !tarjetaId) return res.json({ success: false, message: 'Faltan datos' });
+
+  const montoNum = montoValido(monto);
+  if (montoNum === null) return res.json({ success: false, message: 'El monto debe ser mayor que cero' });
+
+  const numCuotas = cuotasValidas(cuotas);
+  if (numCuotas === null) return res.json({ success: false, message: 'Las cuotas deben ser un número entero mayor que cero' });
 
   const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(parseInt(tarjetaId));
   if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
 
-  const resultado = calcularCuota(parseFloat(monto), tarjeta.tasa_mensual, parseInt(cuotas));
+  const resultado = calcularCuota(montoNum, tarjeta.tasa_mensual, numCuotas);
   const info = db.prepare(`INSERT INTO simulaciones
     (nombre, tarjeta_id, monto, cuotas, tasa_mensual, cuota_mensual, total_pagado, total_intereses)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    nombre, parseInt(tarjetaId), parseFloat(monto), parseInt(cuotas),
+    nombre, parseInt(tarjetaId), montoNum, numCuotas,
     tarjeta.tasa_mensual, resultado.cuota, resultado.total, resultado.intereses
   );
 
@@ -288,26 +504,41 @@ router.post('/simulaciones', (req, res) => {
 
 router.post('/simulaciones/:id/finalizar', (req, res) => {
   const sim = db.prepare('SELECT * FROM simulaciones WHERE id = ?').get(parseInt(req.params.id));
-  if (!sim) return res.json({ success: false, message: 'No encontrada' });
-
-  // Crear compra real
-  const info = db.prepare(`INSERT INTO compras
-    (tarjeta_id, nombre, descripcion, monto, cuotas, cuota_actual, fecha)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    sim.tarjeta_id, sim.nombre, 'De simulación', sim.monto, sim.cuotas, 1, ahoraFecha()
-  );
-
-  // Aumentar deuda
-  const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(sim.tarjeta_id);
-  if (tarjeta) {
-    db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
-      .run(tarjeta.deuda_actual + sim.monto, sim.tarjeta_id);
+  if (!sim) return res.json({ success: false, message: 'Simulación no encontrada' });
+  if (sim.estado === 'FINALIZADA') {
+    return res.json({ success: false, message: 'Esta simulación ya fue convertida en compra' });
   }
 
-  // Marcar simulación como finalizada
-  db.prepare('UPDATE simulaciones SET estado = ? WHERE id = ?').run('FINALIZADA', sim.id);
+  const tarjeta = db.prepare('SELECT * FROM tarjetas WHERE id = ?').get(sim.tarjeta_id);
+  if (!tarjeta) return res.json({ success: false, message: 'Tarjeta no encontrada' });
 
-  res.json({ success: true, compraId: info.lastInsertRowid });
+  const cuotaMensual = sim.cuota_mensual != null
+    ? sim.cuota_mensual
+    : (sim.total_pagado != null ? sim.total_pagado / sim.cuotas : sim.monto / sim.cuotas);
+  const totalIntereses = sim.total_intereses != null
+    ? sim.total_intereses
+    : (sim.total_pagado != null ? sim.total_pagado - sim.monto : 0);
+  const totalAPagar = redondear(cuotaMensual * sim.cuotas);
+
+  const finalizar = db.transaction(() => {
+    const info = db.prepare(`INSERT INTO compras
+      (tarjeta_id, nombre, descripcion, monto, cuotas, cuota_actual, cuota_mensual,
+       total_intereses, sin_interes, fecha)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      sim.tarjeta_id, sim.nombre, 'De simulación', sim.monto, sim.cuotas, 1,
+      cuotaMensual, totalIntereses, totalIntereses > 0 ? 0 : 1, ahoraFecha()
+    );
+
+    db.prepare('UPDATE tarjetas SET deuda_actual = ? WHERE id = ?')
+      .run(redondear(tarjeta.deuda_actual + totalAPagar), tarjeta.id);
+
+    db.prepare('UPDATE simulaciones SET estado = ? WHERE id = ?').run('FINALIZADA', sim.id);
+
+    return info.lastInsertRowid;
+  });
+
+  const compraId = finalizar();
+  res.json({ success: true, compraId });
 });
 
 router.delete('/simulaciones/:id', (req, res) => {
