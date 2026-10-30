@@ -11,7 +11,7 @@ vanilla JS. Installable on the home screen of iOS and Android.
 ![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-f7df1e.svg)
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="880">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="300">
 </p>
 
 ## ✨ Features
@@ -32,11 +32,9 @@ vanilla JS. Installable on the home screen of iOS and Android.
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/movimientos.png" width="45%" alt="Movements">
-  <img src="docs/screenshots/tarjetas.png" width="45%" alt="Credit cards">
-</p>
-<p align="center">
-  <img src="docs/screenshots/detalle-tarjeta.png" width="62%" alt="Card detail">
+  <img src="docs/screenshots/movimientos.png" width="28%" alt="Movements">
+  <img src="docs/screenshots/tarjetas.png" width="28%" alt="Credit cards">
+  <img src="docs/screenshots/detalle-tarjeta.png" width="28%" alt="Card detail">
 </p>
 
 ## 🛠 Tech stack
