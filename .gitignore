@@ -1,3 +1,25 @@
+# Dependencies
 node_modules/
+
+# Data and databases
 data/
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Backups and temporary files
+*.bak
+*.backup-*
+respaldos/
+*.log
+
+# Environment
+.env
+.env.*
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

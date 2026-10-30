@@ -4,6 +4,15 @@ Self-hosted personal finance web app: accounts, income/expenses, transfers, mont
 pending payments and a credit-card module. Built with Node.js, Express, SQLite and
 vanilla JS. Installable on the home screen of iOS and Android.
 
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20-3c873a.svg)
+![Docker](https://img.shields.io/badge/docker-compose-2496ed.svg)
+![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-f7df1e.svg)
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="880">
+</p>
+
 ## ✨ Features
 
 | Feature | Description |
@@ -18,6 +27,16 @@ vanilla JS. Installable on the home screen of iOS and Android.
 | 💳 Credit cards | Cards, installments, interest, minimum payment and simulator |
 | 🌙 Dark mode | Full dark theme, persisted in `localStorage` |
 | 📱 Home screen | "Add to Home Screen" on iPhone and Android |
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/movimientos.png" width="45%" alt="Movements">
+  <img src="docs/screenshots/tarjetas.png" width="45%" alt="Credit cards">
+</p>
+<p align="center">
+  <img src="docs/screenshots/detalle-tarjeta.png" width="62%" alt="Card detail">
+</p>
 
 ## 🛠 Tech stack
 
@@ -53,6 +72,13 @@ Requires Node 20 or newer. The database files are created automatically under
 finanzas-app/
 ├── docker-compose.yml
 ├── .dockerignore
+├── .editorconfig
+├── LICENSE
+├── SECURITY.md
+├── .github/
+│   └── workflows/ci.yml        # syntax check on every push
+├── docs/
+│   └── screenshots/
 ├── data/                       # SQLite volumes (created at runtime)
 ├── backend/
 │   ├── Dockerfile              # multi-stage build (compiles better-sqlite3)
@@ -64,7 +90,8 @@ finanzas-app/
 └── frontend/
     ├── index.html              # single-page app (both modules)
     ├── app.js                  # UI logic
-    └── styles.css              # variables, dark mode, responsive layout
+    ├── styles.css              # variables, dark mode, responsive layout
+    └── icon.png
 ```
 
 ## 🐳 Docker
@@ -194,4 +221,4 @@ it directly to the internet as is.
 
 ## 📄 License
 
-MIT
+[MIT](LICENSE) © Juan Pablo Restrepo Acosta

@@ -1,6 +1,15 @@
 {
   "name": "finanzas-liquid-glass-backend",
   "version": "1.0.0",
+  "description": "Backend de FinanzasApp: cuentas, movimientos, pendientes y tarjetas de crédito",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JUANRESTREPO95/finanzas-app.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
