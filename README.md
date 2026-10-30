@@ -4,6 +4,7 @@ Self-hosted personal finance web app: accounts, income/expenses, transfers, mont
 pending payments and a credit-card module. Built with Node.js, Express, SQLite and
 vanilla JS. Installable on the home screen of iOS and Android.
 
+[![CI](https://github.com/JUANRESTREPO95/finanzas-app/actions/workflows/ci.yml/badge.svg)](https://github.com/JUANRESTREPO95/finanzas-app/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-3c873a.svg)
 ![Docker](https://img.shields.io/badge/docker-compose-2496ed.svg)
